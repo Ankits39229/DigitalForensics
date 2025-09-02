@@ -280,5 +280,4 @@ TriageIR-Portable.zip: [checksum-available-in-release]
 
 **Status**: ✅ Production Ready  
 **Version**: 1.0.0  
-**Last Updated**: December 2024  
 **License**: MIT License
