@@ -3,34 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com; style-src 'self' 'unsafe-inline' https://unpkg.com;">
     <title>TriageIR GUI - Digital Forensics Triage Tool</title>
     <link rel="stylesheet" href="styles/main.css">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
     <div class="app-container">
         <!-- Custom Title Bar -->
         <div class="custom-titlebar">
             <div class="titlebar-drag-region">
-                <div class="titlebar-icon">🔍</div>
+                <div class="titlebar-icon">
+                    <i data-lucide="search" style="width: 14px; height: 14px;"></i>
+                </div>
                 <div class="titlebar-title">TriageIR - Digital Forensics Triage Tool</div>
             </div>
             <div class="titlebar-controls">
                 <button class="titlebar-button" id="minimizeBtn" title="Minimize">
-                    <svg width="12" height="12" viewBox="0 0 12 12">
-                        <rect x="0" y="5" width="12" height="2" fill="currentColor"/>
-                    </svg>
+                    <i data-lucide="minus" style="width: 12px; height: 12px;"></i>
                 </button>
                 <button class="titlebar-button" id="maximizeBtn" title="Maximize">
-                    <svg width="12" height="12" viewBox="0 0 12 12">
-                        <rect x="1" y="1" width="10" height="10" stroke="currentColor" stroke-width="1.5" fill="none"/>
-                    </svg>
+                    <i data-lucide="square" style="width: 12px; height: 12px;"></i>
                 </button>
                 <button class="titlebar-button titlebar-close" id="closeBtn" title="Close">
-                    <svg width="12" height="12" viewBox="0 0 12 12">
-                        <line x1="1" y1="1" x2="11" y2="11" stroke="currentColor" stroke-width="1.5"/>
-                        <line x1="11" y1="1" x2="1" y2="11" stroke="currentColor" stroke-width="1.5"/>
-                    </svg>
+                    <i data-lucide="x" style="width: 12px; height: 12px;"></i>
                 </button>
             </div>
         </div>
@@ -39,12 +36,17 @@
         <header class="app-header">
             <div class="header-content">
                 <div class="logo-section">
-                    <h1>🔍 TriageIR</h1>
+                    <h1>
+                        <i data-lucide="shield-check" style="width: 24px; height: 24px; vertical-align: middle; margin-right: 8px;"></i>
+                        TriageIR
+                    </h1>
                     <span class="subtitle">Digital Forensics Triage Tool</span>
                 </div>
                 <div class="status-section">
                     <div class="cli-status" id="cliStatus">
-                        <span class="status-indicator" id="statusIndicator">⚪</span>
+                        <span class="status-indicator" id="statusIndicator">
+                            <i data-lucide="circle" style="width: 12px; height: 12px;"></i>
+                        </span>
                         <span class="status-text" id="statusText">Checking CLI...</span>
                     </div>
                 </div>
@@ -56,35 +58,47 @@
             <!-- Welcome Screen -->
             <div class="welcome-screen" id="welcomeScreen">
                 <div class="welcome-content">
-                    <h2>🚀 Welcome to TriageIR</h2>
+                    <h2>
+                        <i data-lucide="rocket" style="width: 28px; height: 28px; vertical-align: middle; margin-right: 8px;"></i>
+                        Welcome to TriageIR
+                    </h2>
                     <p>Professional digital forensics triage tool for rapid system analysis</p>
                     
                     <div class="action-buttons">
                         <button class="btn btn-primary" id="quickScanBtn">
-                            <span class="btn-icon">⚡</span>
+                            <i data-lucide="zap" class="btn-icon" style="width: 16px; height: 16px;"></i>
                             Quick Scan
                         </button>
                         <button class="btn btn-secondary" id="customScanBtn">
-                            <span class="btn-icon">⚙️</span>
+                            <i data-lucide="settings" class="btn-icon" style="width: 16px; height: 16px;"></i>
                             Custom Scan
                         </button>
                         <button class="btn btn-secondary" id="openFileBtn">
-                            <span class="btn-icon">📁</span>
+                            <i data-lucide="folder-open" class="btn-icon" style="width: 16px; height: 16px;"></i>
                             Open Results
                         </button>
                     </div>
 
                     <div class="info-cards">
                         <div class="info-card">
-                            <h3>🔍 System Analysis</h3>
+                            <h3>
+                                <i data-lucide="activity" style="width: 20px; height: 20px; vertical-align: middle; margin-right: 6px;"></i>
+                                System Analysis
+                            </h3>
                             <p>Collect running processes, network connections, and system information</p>
                         </div>
                         <div class="info-card">
-                            <h3>🛡️ Security Events</h3>
+                            <h3>
+                                <i data-lucide="shield-alert" style="width: 20px; height: 20px; vertical-align: middle; margin-right: 6px;"></i>
+                                Security Events
+                            </h3>
                             <p>Analyze Windows event logs and security-related artifacts</p>
                         </div>
                         <div class="info-card">
-                            <h3>📊 Professional Reports</h3>
+                            <h3>
+                                <i data-lucide="bar-chart-3" style="width: 20px; height: 20px; vertical-align: middle; margin-right: 6px;"></i>
+                                Professional Reports
+                            </h3>
                             <p>Generate comprehensive reports in multiple formats</p>
                         </div>
                     </div>
@@ -94,7 +108,10 @@
             <!-- Scan Progress Screen -->
             <div class="scan-screen hidden" id="scanScreen">
                 <div class="scan-content">
-                    <h2>🔄 Scanning System...</h2>
+                    <h2>
+                        <i data-lucide="loader" style="width: 28px; height: 28px; vertical-align: middle; margin-right: 8px; animation: spin 2s linear infinite;"></i>
+                        Scanning System...
+                    </h2>
                     <div class="progress-container">
                         <div class="progress-bar">
                             <div class="progress-fill" id="progressFill"></div>
@@ -114,7 +131,10 @@
             <!-- Results Screen -->
             <div class="results-screen hidden" id="resultsScreen">
                 <div class="results-header">
-                    <h2>📋 Scan Results</h2>
+                    <h2>
+                        <i data-lucide="clipboard-check" style="width: 24px; height: 24px; vertical-align: middle; margin-right: 8px;"></i>
+                        Scan Results
+                    </h2>
                     <div class="results-actions">
                         <button class="btn btn-primary" id="newScanBtn">New Scan</button>
                         <button class="btn btn-secondary" id="saveResultsBtn">Save Results</button>
@@ -238,7 +258,10 @@
                                 <h3>Execution Evidence</h3>
                                 
                                 <div class="execution-section">
-                                    <h4>📝 Prefetch Files</h4>
+                                    <h4>
+                                        <i data-lucide="file-text" style="width: 18px; height: 18px; vertical-align: middle; margin-right: 6px;"></i>
+                                        Prefetch Files
+                                    </h4>
                                     <div class="table-container">
                                         <table class="data-table" id="prefetchTable">
                                             <thead>
@@ -257,7 +280,10 @@
                                 </div>
                                 
                                 <div class="execution-section">
-                                    <h4>🔍 Shimcache Entries</h4>
+                                    <h4>
+                                        <i data-lucide="database" style="width: 18px; height: 18px; vertical-align: middle; margin-right: 6px;"></i>
+                                        Shimcache Entries
+                                    </h4>
                                     <div class="table-container">
                                         <table class="data-table" id="shimcacheTable">
                                             <thead>
@@ -285,8 +311,13 @@
         <div class="modal hidden" id="customScanModal">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h3>⚙️ Custom Scan Configuration</h3>
-                    <button class="modal-close" id="closeModalBtn">✕</button>
+                    <h3>
+                        <i data-lucide="sliders" style="width: 20px; height: 20px; vertical-align: middle; margin-right: 6px;"></i>
+                        Custom Scan Configuration
+                    </h3>
+                    <button class="modal-close" id="closeModalBtn">
+                        <i data-lucide="x" style="width: 16px; height: 16px;"></i>
+                    </button>
                 </div>
                 <div class="modal-body">
                     <div class="form-group">
@@ -323,8 +354,13 @@
         <div class="modal hidden" id="errorModal">
             <div class="modal-content error-modal">
                 <div class="modal-header error-header">
-                    <h3>❌ Scan Error</h3>
-                    <button class="modal-close" id="closeErrorBtn">✕</button>
+                    <h3>
+                        <i data-lucide="alert-circle" style="width: 20px; height: 20px; vertical-align: middle; margin-right: 6px;"></i>
+                        Scan Error
+                    </h3>
+                    <button class="modal-close" id="closeErrorBtn">
+                        <i data-lucide="x" style="width: 16px; height: 16px;"></i>
+                    </button>
                 </div>
                 <div class="modal-body">
                     <div class="error-details">
@@ -355,5 +391,11 @@
 
     <!-- Scripts -->
     <script src="js/app.js"></script>
+    <script>
+        // Initialize Lucide icons after page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+        });
+    </script>
 </body>
 </html>

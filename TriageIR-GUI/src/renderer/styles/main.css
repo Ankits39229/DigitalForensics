@@ -74,6 +74,29 @@ body {
     -moz-osx-font-smoothing: grayscale;
 }
 
+/* Global SVG Icon Styling */
+svg {
+    vertical-align: middle;
+    pointer-events: none;
+}
+
+i[data-lucide] {
+    display: inline-flex;
+    pointer-events: none;
+}
+
+i[data-lucide] svg {
+    pointer-events: none;
+}
+
+.btn-icon svg,
+h1 svg,
+h2 svg,
+h3 svg,
+h4 svg {
+    flex-shrink: 0;
+}
+
 .app-container {
     display: flex;
     flex-direction: column;
@@ -110,6 +133,13 @@ body {
     font-size: 14px;
     margin-right: var(--spacing-s);
     color: var(--color-accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.titlebar-icon svg {
+    display: block;
 }
 
 .titlebar-title {
@@ -387,6 +417,9 @@ body {
 
 .btn-icon {
     font-size: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .info-cards {
@@ -789,6 +822,15 @@ body {
     to {
         opacity: 1;
         transform: translateY(0);
+    }
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
     }
 }
 

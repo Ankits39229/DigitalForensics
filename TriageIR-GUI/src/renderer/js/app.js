@@ -158,13 +158,18 @@ class TriageIRApp {
         const statusText = document.getElementById('statusText');
         
         if (this.cliStatus.available) {
-            statusIndicator.textContent = '🟢';
+            statusIndicator.innerHTML = '<i data-lucide="check-circle" style="width: 12px; height: 12px; color: #107C10;"></i>';
             statusText.textContent = `CLI Ready (${this.cliStatus.version})`;
             statusText.className = 'status-text text-success';
         } else {
-            statusIndicator.textContent = '🔴';
+            statusIndicator.innerHTML = '<i data-lucide="x-circle" style="width: 12px; height: 12px; color: #D13438;"></i>';
             statusText.textContent = 'CLI Not Available';
             statusText.className = 'status-text text-error';
+        }
+        
+        // Reinitialize Lucide icons
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
         }
     }
 
@@ -631,15 +636,25 @@ class TriageIRApp {
         const end = start + this.itemsPerPage;
         const pageData = persistence.slice(start, end);
         
-        tableBody.innerHTML = pageData.map(item => `
-            <tr>
-                <td>${item.type || 'N/A'}</td>
-                <td>${item.name || 'N/A'}</td>
-                <td>${item.location || 'N/A'}</td>
-                <td title="${item.value || ''}">${(item.value || '').substring(0, 50)}${(item.value || '').length > 50 ? '...' : ''}</td>
-                <td>${item.is_suspicious ? '⚠️ Yes' : '✅ No'}</td>
-            </tr>
-        `).join('');
+        tableBody.innerHTML = pageData.map(item => {
+            const suspiciousIcon = item.is_suspicious 
+                ? '<i data-lucide="alert-triangle" style="width: 14px; height: 14px; color: #F7630C;"></i> Yes' 
+                : '<i data-lucide="check" style="width: 14px; height: 14px; color: #107C10;"></i> No';
+            return `
+                <tr>
+                    <td>${item.type || 'N/A'}</td>
+                    <td>${item.name || 'N/A'}</td>
+                    <td>${item.location || 'N/A'}</td>
+                    <td title="${item.value || ''}">${(item.value || '').substring(0, 50)}${(item.value || '').length > 50 ? '...' : ''}</td>
+                    <td>${suspiciousIcon}</td>
+                </tr>
+            `;
+        }).join('');
+        
+        // Reinitialize Lucide icons
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
         
         this.addPaginationInfo('persistenceTable', persistence.length);
     }
