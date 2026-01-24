@@ -39,30 +39,54 @@ class TriageIRApp {
     }
 
     setupEventListeners() {
-        // Window control buttons
+        // Window control buttons with defensive event handling
         const minimizeBtn = document.getElementById('minimizeBtn');
         const maximizeBtn = document.getElementById('maximizeBtn');
         const closeBtn = document.getElementById('closeBtn');
         
         if (minimizeBtn) {
-            minimizeBtn.addEventListener('click', () => {
+            // Use capture phase to ensure we catch the event first
+            minimizeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                e.preventDefault();
                 console.log('Minimize button clicked');
                 ipcRenderer.send('window-minimize');
-            });
+            }, true);
         }
         
         if (maximizeBtn) {
-            maximizeBtn.addEventListener('click', () => {
+            maximizeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                e.preventDefault();
                 console.log('Maximize button clicked');
                 ipcRenderer.send('window-maximize');
-            });
+            }, true);
         }
         
         if (closeBtn) {
-            closeBtn.addEventListener('click', () => {
+            // Multiple event handlers for redundancy
+            closeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                e.preventDefault();
                 console.log('Close button clicked');
                 ipcRenderer.send('window-close');
-            });
+            }, true);
+            
+            // Backup handler for mousedown
+            closeBtn.addEventListener('mousedown', (e) => {
+                if (e.button === 0) { // Left click only
+                    e.stopPropagation();
+                    e.preventDefault();
+                }
+            }, true);
+            
+            // Backup handler for mouseup
+            closeBtn.addEventListener('mouseup', (e) => {
+                if (e.button === 0) { // Left click only
+                    console.log('Close button mouseup (backup handler)');
+                    ipcRenderer.send('window-close');
+                }
+            }, true);
         } else {
             console.error('Close button not found in DOM');
         }
@@ -469,11 +493,46 @@ class TriageIRApp {
         // Update progress text
         progressText.textContent = message;
         
-        // Simulate progress (in real implementation, CLI would provide progress info)
-        const currentWidth = parseInt(progressFill.style.width) || 0;
-        if (currentWidth < 90) {
-            progressFill.style.width = (currentWidth + 10) + '%';
+        // Data-driven progress based on scan stages
+        const stages = {
+            // Stage detection patterns and their progress values
+            'Collecting system information': 10,
+            'system_info': 10,
+            'Enumerating running processes': 25,
+            'processes': 25,
+            'Collecting network connections': 40,
+            'network': 40,
+            'Analyzing persistence mechanisms': 60,
+            'persistence': 60,
+            'Collecting event logs': 75,
+            'event_logs': 75,
+            'events': 75,
+            'Collecting execution evidence': 85,
+            'execution': 85,
+            'prefetch': 85,
+            'shimcache': 90,
+            'Finalizing scan': 95,
+            'Writing output': 95,
+            'Scan complete': 100,
+            'SUCCESS': 100
+        };
+        
+        // Check message against stage patterns
+        let progressValue = parseInt(progressFill.style.width) || 0;
+        const messageLower = message.toLowerCase();
+        
+        for (const [pattern, value] of Object.entries(stages)) {
+            if (messageLower.includes(pattern.toLowerCase())) {
+                // Only update if new stage is ahead of current progress
+                if (value > progressValue) {
+                    progressValue = value;
+                    break;
+                }
+            }
         }
+        
+        // Smooth progress update
+        progressFill.style.width = progressValue + '%';
     }
 
     populateResults() {

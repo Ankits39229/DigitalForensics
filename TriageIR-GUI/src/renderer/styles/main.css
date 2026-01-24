@@ -74,19 +74,30 @@ body {
     -moz-osx-font-smoothing: grayscale;
 }
 
-/* Global SVG Icon Styling */
+/* Global SVG Icon Styling - Prevent ALL icons from blocking clicks */
 svg {
     vertical-align: middle;
-    pointer-events: none;
+    pointer-events: none !important;
 }
 
 i[data-lucide] {
     display: inline-flex;
-    pointer-events: none;
+    pointer-events: none !important;
 }
 
 i[data-lucide] svg {
-    pointer-events: none;
+    pointer-events: none !important;
+}
+
+/* Ensure all icon elements can never block clicks */
+i, span.icon, .icon, [class*="icon-"] {
+    pointer-events: none !important;
+}
+
+/* Pseudo-elements must never block clicks */
+*::before,
+*::after {
+    pointer-events: none !important;
 }
 
 .btn-icon svg,
@@ -168,6 +179,12 @@ h4 svg {
     transition: background-color var(--duration-fast) var(--easing-standard);
     padding: 0;
     position: relative;
+    z-index: 100; /* Ensure button is above other elements */
+}
+
+/* Ensure all child elements never block clicks */
+.titlebar-button * {
+    pointer-events: none !important;
 }
 
 .titlebar-button::before {
