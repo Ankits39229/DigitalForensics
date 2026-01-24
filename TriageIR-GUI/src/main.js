@@ -57,7 +57,11 @@ class TriageIRMain {
                 enableRemoteModule: true
             },
             icon: path.join(__dirname, '../assets/icon.png'),
-            title: 'TriageIR - Digital Forensics Triage Tool'
+            title: 'TriageIR - Digital Forensics Triage Tool',
+            frame: false,
+            minWidth: 800,
+            minHeight: 600,
+            backgroundColor: '#667eea'
         });
 
         this.mainWindow.loadFile(path.join(__dirname, 'renderer/index.html'));
@@ -151,6 +155,25 @@ class TriageIRMain {
                 ]
             });
             return result;
+        });
+
+        // Window control handlers
+        ipcMain.on('window-minimize', () => {
+            if (this.mainWindow) this.mainWindow.minimize();
+        });
+
+        ipcMain.on('window-maximize', () => {
+            if (this.mainWindow) {
+                if (this.mainWindow.isMaximized()) {
+                    this.mainWindow.unmaximize();
+                } else {
+                    this.mainWindow.maximize();
+                }
+            }
+        });
+
+        ipcMain.on('window-close', () => {
+            if (this.mainWindow) this.mainWindow.close();
         });
     }
 

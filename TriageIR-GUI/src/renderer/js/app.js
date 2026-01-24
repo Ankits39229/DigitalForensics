@@ -39,6 +39,34 @@ class TriageIRApp {
     }
 
     setupEventListeners() {
+        // Window control buttons
+        const minimizeBtn = document.getElementById('minimizeBtn');
+        const maximizeBtn = document.getElementById('maximizeBtn');
+        const closeBtn = document.getElementById('closeBtn');
+        
+        if (minimizeBtn) {
+            minimizeBtn.addEventListener('click', () => {
+                console.log('Minimize button clicked');
+                ipcRenderer.send('window-minimize');
+            });
+        }
+        
+        if (maximizeBtn) {
+            maximizeBtn.addEventListener('click', () => {
+                console.log('Maximize button clicked');
+                ipcRenderer.send('window-maximize');
+            });
+        }
+        
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                console.log('Close button clicked');
+                ipcRenderer.send('window-close');
+            });
+        } else {
+            console.error('Close button not found in DOM');
+        }
+
         // Welcome screen buttons
         document.getElementById('quickScanBtn').addEventListener('click', () => {
             this.startQuickScan();

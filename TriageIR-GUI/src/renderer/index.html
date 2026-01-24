@@ -9,6 +9,32 @@
 </head>
 <body>
     <div class="app-container">
+        <!-- Custom Title Bar -->
+        <div class="custom-titlebar">
+            <div class="titlebar-drag-region">
+                <div class="titlebar-icon">🔍</div>
+                <div class="titlebar-title">TriageIR - Digital Forensics Triage Tool</div>
+            </div>
+            <div class="titlebar-controls">
+                <button class="titlebar-button" id="minimizeBtn" title="Minimize">
+                    <svg width="12" height="12" viewBox="0 0 12 12">
+                        <rect x="0" y="5" width="12" height="2" fill="currentColor"/>
+                    </svg>
+                </button>
+                <button class="titlebar-button" id="maximizeBtn" title="Maximize">
+                    <svg width="12" height="12" viewBox="0 0 12 12">
+                        <rect x="1" y="1" width="10" height="10" stroke="currentColor" stroke-width="1.5" fill="none"/>
+                    </svg>
+                </button>
+                <button class="titlebar-button titlebar-close" id="closeBtn" title="Close">
+                    <svg width="12" height="12" viewBox="0 0 12 12">
+                        <line x1="1" y1="1" x2="11" y2="11" stroke="currentColor" stroke-width="1.5"/>
+                        <line x1="11" y1="1" x2="1" y2="11" stroke="currentColor" stroke-width="1.5"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
         <!-- Header -->
         <header class="app-header">
             <div class="header-content">
