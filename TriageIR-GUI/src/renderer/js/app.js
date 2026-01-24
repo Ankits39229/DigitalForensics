@@ -1078,7 +1078,7 @@ class TriageIRApp {
     }
     
     setupExpandableRows() {
-        const tables = ['processesTable', 'networkTable', 'persistenceTable', 'eventsTable', 'prefetchTable', 'shimcacheTable'];
+        const tables = ['processesTable', 'networkTable', 'persistenceTable', 'eventsTable', 'prefetchTable', 'shimcacheTable', 'fileActivityTable'];
         
         tables.forEach(tableId => {
             const table = document.getElementById(tableId);
@@ -2803,6 +2803,18 @@ Timestamp: ${new Date().toISOString()}
             return date.toLocaleString();
         } catch (e) {
             return '⚠️ Invalid';
+        }
+    }
+
+    isWithinLast24Hours(timestamp) {
+        if (!timestamp) return false;
+        try {
+            const activityDate = new Date(timestamp);
+            const now = new Date();
+            const twentyFourHoursAgo = new Date(now.getTime() - (24 * 60 * 60 * 1000));
+            return activityDate >= twentyFourHoursAgo && activityDate <= now;
+        } catch (e) {
+            return false;
         }
     }
 
