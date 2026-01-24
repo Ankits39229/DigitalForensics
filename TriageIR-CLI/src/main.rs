@@ -545,6 +545,16 @@ fn collect_system_info_safe(logger: &Logger) -> Option<serde_json::Value> {
     let operation = || -> ForensicResult<serde_json::Value> {
         let mut sys = System::new_all();
         sys.refresh_all();
+
+        // Use the dedicated collector to include logged-on users and uptime
+        let (basic_info, collection_logs) = system_info::collect_system_info();
+        for entry in collection_logs {
+            match entry.level.as_str() {
+                "ERROR" => logger.error(&entry.message),
+                "WARN" => logger.warn(&entry.message),
+                _ => logger.info(&entry.message),
+            }
+        }
         
         let hostname = std::env::var("COMPUTERNAME")
             .map_err(|_| ForensicError::system_api_error("Failed to get hostname"))?;
@@ -564,12 +574,20 @@ fn collect_system_info_safe(logger: &Logger) -> Option<serde_json::Value> {
             "architecture": std::env::consts::ARCH,
             "current_user": username,
             "uptime_hours": (uptime as f64) / 3600.0,
+            "uptime_secs": uptime,
             "last_boot_time": chrono::DateTime::from_timestamp(boot_time as i64, 0)
                 .unwrap_or_else(|| chrono::Utc::now())
                 .to_rfc3339(),
             "total_memory": sys.total_memory(),
             "used_memory": sys.used_memory(),
-            "cpu_count": sys.cpus().len()
+            "cpu_count": sys.cpus().len(),
+            "logged_on_users": basic_info.logged_on_users.into_iter().map(|u| {
+                json!({
+                    "username": u.username,
+                    "domain": u.domain,
+                    "logon_time": u.logon_time
+                })
+            }).collect::<Vec<_>>()
         }))
     };
     
