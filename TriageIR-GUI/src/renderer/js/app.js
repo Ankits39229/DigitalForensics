@@ -8,12 +8,20 @@ class TriageIRApp {
         this.currentScanData = null;
         this.isScanning = false;
         this.cliStatus = null;
+        this.currentPage = 1;
+        this.itemsPerPage = 50;
+        this.currentTab = 'processes';
+        this.AUTOSAVE_KEY = 'triageir_autosave';
+        this.RECENT_FILES_KEY = 'triageir_recent_files';
         
         this.init();
     }
 
     async init() {
         console.log('Initializing TriageIR GUI...');
+        
+        // Check for autosaved session
+        this.checkAutosave();
         
         // Set up event listeners
         this.setupEventListeners();
@@ -23,6 +31,9 @@ class TriageIRApp {
         
         // Set up IPC listeners
         this.setupIPCListeners();
+        
+        // Set up autosave interval
+        this.setupAutosave();
         
         console.log('TriageIR GUI initialized successfully');
     }
@@ -34,7 +45,7 @@ class TriageIRApp {
         });
         
         document.getElementById('customScanBtn').addEventListener('click', () => {
-            this.startCustomScan();
+            this.showCustomScanModal();
         });
         
         document.getElementById('openFileBtn').addEventListener('click', () => {
@@ -62,8 +73,37 @@ class TriageIRApp {
         // Tab buttons
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
-                this.switchTab(e.target.dataset.tab);
+                const tab = e.target.dataset.tab;
+                this.currentTab = tab;
+                this.currentPage = 1; // Reset pagination when switching tabs
+                this.switchTab(tab);
             });
+        });
+
+        // Custom scan modal
+        document.getElementById('closeModalBtn').addEventListener('click', () => {
+            document.getElementById('customScanModal').classList.add('hidden');
+        });
+        
+        document.getElementById('cancelConfigBtn').addEventListener('click', () => {
+            document.getElementById('customScanModal').classList.add('hidden');
+        });
+        
+        document.getElementById('startConfiguredScanBtn').addEventListener('click', () => {
+            this.startConfiguredScan();
+        });
+
+        // Error modal
+        document.getElementById('closeErrorBtn').addEventListener('click', () => {
+            document.getElementById('errorModal').classList.add('hidden');
+        });
+        
+        document.getElementById('closeErrorOkBtn').addEventListener('click', () => {
+            document.getElementById('errorModal').classList.add('hidden');
+        });
+        
+        document.getElementById('copyErrorBtn').addEventListener('click', () => {
+            this.copyErrorDetails();
         });
     }
 
@@ -102,7 +142,12 @@ class TriageIRApp {
 
     async startQuickScan() {
         if (!this.cliStatus.available) {
-            alert('CLI is not available. Please ensure triageir-cli.exe is accessible.');
+            this.showError({
+                category: 'CLI Not Available',
+                message: 'The TriageIR CLI is not available or not found.',
+                remedy: 'Please ensure triageir-cli.exe is in the correct location and try again.',
+                technical: `Expected CLI path: ${this.cliStatus.path || 'Unknown'}`
+            });
             return;
         }
 
@@ -115,14 +160,31 @@ class TriageIRApp {
             });
             
             if (result.success) {
+                // Validate data before displaying
+                const validationResult = this.validateScanData(result.data);
+                if (!validationResult.valid) {
+                    this.showError({
+                        category: 'Data Validation Warning',
+                        message: 'The scan completed but the data contains validation warnings.',
+                        remedy: validationResult.errors.join('; '),
+                        technical: JSON.stringify(validationResult.warnings, null, 2)
+                    });
+                }
+                
                 this.currentScanData = result.data;
+                this.autosaveScanData();
                 this.showResultsScreen();
             } else {
                 throw new Error(result.error);
             }
         } catch (error) {
             console.error('Scan failed:', error);
-            alert(`Scan failed: ${error.message || error}`);
+            this.showError({
+                category: 'Scan Execution Error',
+                message: 'The scan failed to complete successfully.',
+                remedy: 'Check that you have Administrator privileges and try again. If the problem persists, check the technical details below.',
+                technical: error.stdout || error.message || JSON.stringify(error, null, 2)
+            });
             this.showWelcomeScreen();
         } finally {
             this.isScanning = false;
@@ -130,29 +192,66 @@ class TriageIRApp {
     }
 
     async startCustomScan() {
+        // This method is deprecated - use showCustomScanModal instead
+        this.showCustomScanModal();
+    }
+
+    showCustomScanModal() {
         if (!this.cliStatus.available) {
-            alert('CLI is not available. Please ensure triageir-cli.exe is accessible.');
+            this.showError({
+                category: 'CLI Not Available',
+                message: 'The TriageIR CLI is not available or not found.',
+                remedy: 'Please ensure triageir-cli.exe is in the correct location and try again.',
+                technical: `Expected CLI path: ${this.cliStatus.path || 'Unknown'}`
+            });
             return;
         }
+        
+        document.getElementById('customScanModal').classList.remove('hidden');
+    }
 
-        // For now, just do a verbose scan (can be enhanced later)
+    async startConfiguredScan() {
+        document.getElementById('customScanModal').classList.add('hidden');
+        
+        const options = {
+            verbose: document.getElementById('verboseCheck').checked,
+            skipHashes: document.getElementById('skipHashesCheck').checked,
+            skipEvents: document.getElementById('skipEventsCheck').checked,
+            maxEvents: parseInt(document.getElementById('maxEventsInput').value)
+        };
+        
         this.showScanScreen();
         this.isScanning = true;
         
         try {
-            const result = await ipcRenderer.invoke('start-scan', {
-                verbose: true
-            });
+            const result = await ipcRenderer.invoke('start-scan', options);
             
             if (result.success) {
+                // Validate data before displaying
+                const validationResult = this.validateScanData(result.data);
+                if (!validationResult.valid) {
+                    this.showError({
+                        category: 'Data Validation Error',
+                        message: 'The scan completed but the data contains validation errors.',
+                        remedy: validationResult.errors.join('; '),
+                        technical: JSON.stringify(validationResult.warnings, null, 2)
+                    });
+                }
+                
                 this.currentScanData = result.data;
+                this.autosaveScanData();
                 this.showResultsScreen();
             } else {
                 throw new Error(result.error);
             }
         } catch (error) {
             console.error('Scan failed:', error);
-            alert(`Scan failed: ${error.message || error}`);
+            this.showError({
+                category: 'Scan Execution Error',
+                message: 'The scan failed to complete successfully.',
+                remedy: 'Check that you have Administrator privileges and try again.',
+                technical: error.stdout || error.message || JSON.stringify(error, null, 2)
+            });
             this.showWelcomeScreen();
         } finally {
             this.isScanning = false;
@@ -176,11 +275,26 @@ class TriageIRApp {
         }
     }
 
-    cancelScan() {
-        // For now, just return to welcome screen
-        // In a full implementation, this would terminate the CLI process
-        this.isScanning = false;
-        this.showWelcomeScreen();
+    async cancelScan() {
+        if (!this.isScanning) {
+            return;
+        }
+        
+        try {
+            const result = await ipcRenderer.invoke('cancel-scan');
+            if (result.success) {
+                console.log('Scan cancelled successfully');
+                this.isScanning = false;
+                this.showWelcomeScreen();
+            } else {
+                console.warn('No active scan to cancel');
+            }
+        } catch (error) {
+            console.error('Failed to cancel scan:', error);
+            // Force return to welcome screen anyway
+            this.isScanning = false;
+            this.showWelcomeScreen();
+        }
     }
 
     async saveResults() {
@@ -441,7 +555,11 @@ class TriageIRApp {
         const tableBody = document.getElementById('processesTableBody');
         const processes = this.currentScanData.artifacts?.running_processes || [];
         
-        tableBody.innerHTML = processes.slice(0, 100).map(proc => `
+        const start = (this.currentPage - 1) * this.itemsPerPage;
+        const end = start + this.itemsPerPage;
+        const pageData = processes.slice(start, end);
+        
+        tableBody.innerHTML = pageData.map(proc => `
             <tr>
                 <td>${proc.pid || 'N/A'}</td>
                 <td>${proc.name || 'N/A'}</td>
@@ -450,13 +568,19 @@ class TriageIRApp {
                 <td title="${proc.command_line || ''}">${(proc.command_line || '').substring(0, 50)}${(proc.command_line || '').length > 50 ? '...' : ''}</td>
             </tr>
         `).join('');
+        
+        this.addPaginationInfo('processesTable', processes.length);
     }
 
     populateNetworkTable() {
         const tableBody = document.getElementById('networkTableBody');
         const connections = this.currentScanData.artifacts?.network_connections || [];
         
-        tableBody.innerHTML = connections.slice(0, 100).map(conn => `
+        const start = (this.currentPage - 1) * this.itemsPerPage;
+        const end = start + this.itemsPerPage;
+        const pageData = connections.slice(start, end);
+        
+        tableBody.innerHTML = pageData.map(conn => `
             <tr>
                 <td>${conn.protocol || 'N/A'}</td>
                 <td>${conn.local_address || 'N/A'}</td>
@@ -467,13 +591,19 @@ class TriageIRApp {
                 <td>${conn.pid || conn.process_name || 'N/A'}</td>
             </tr>
         `).join('');
+        
+        this.addPaginationInfo('networkTable', connections.length);
     }
 
     populatePersistenceTable() {
         const tableBody = document.getElementById('persistenceTableBody');
         const persistence = this.currentScanData.artifacts?.persistence_mechanisms || [];
         
-        tableBody.innerHTML = persistence.slice(0, 100).map(item => `
+        const start = (this.currentPage - 1) * this.itemsPerPage;
+        const end = start + this.itemsPerPage;
+        const pageData = persistence.slice(start, end);
+        
+        tableBody.innerHTML = pageData.map(item => `
             <tr>
                 <td>${item.type || 'N/A'}</td>
                 <td>${item.name || 'N/A'}</td>
@@ -482,6 +612,8 @@ class TriageIRApp {
                 <td>${item.is_suspicious ? '⚠️ Yes' : '✅ No'}</td>
             </tr>
         `).join('');
+        
+        this.addPaginationInfo('persistenceTable', persistence.length);
     }
 
     populateEventsTable() {
@@ -495,7 +627,11 @@ class TriageIRApp {
             ...(eventLogs.system || []).map(event => ({ ...event, log_name: 'System' }))
         ];
         
-        tableBody.innerHTML = allEvents.slice(0, 100).map(event => `
+        const start = (this.currentPage - 1) * this.itemsPerPage;
+        const end = start + this.itemsPerPage;
+        const pageData = allEvents.slice(start, end);
+        
+        tableBody.innerHTML = pageData.map(event => `
             <tr>
                 <td>${event.log_name || 'N/A'}</td>
                 <td>${event.event_id || 'N/A'}</td>
@@ -505,6 +641,308 @@ class TriageIRApp {
                 <td title="${event.message || ''}">${(event.message || '').substring(0, 100)}${(event.message || '').length > 100 ? '...' : ''}</td>
             </tr>
         `).join('');
+        
+        this.addPaginationInfo('eventsTable', allEvents.length);
+    }
+
+    addPaginationInfo(tableId, totalItems) {
+        const table = document.getElementById(tableId);
+        const container = table.closest('.table-container');
+        
+        // Remove existing pagination if present
+        const existingPagination = container.querySelector('.pagination-info');
+        if (existingPagination) {
+            existingPagination.remove();
+        }
+        
+        if (totalItems === 0) return;
+        
+        const totalPages = Math.ceil(totalItems / this.itemsPerPage);
+        const start = (this.currentPage - 1) * this.itemsPerPage + 1;
+        const end = Math.min(start + this.itemsPerPage - 1, totalItems);
+        
+        const paginationDiv = document.createElement('div');
+        paginationDiv.className = 'pagination-info';
+        paginationDiv.innerHTML = `
+            <div class="pagination-controls">
+                <span>Showing ${start}-${end} of ${totalItems} items</span>
+                <div class="pagination-buttons">
+                    <button class="btn btn-small" ${this.currentPage === 1 ? 'disabled' : ''} onclick="window.triageApp.changePage(${this.currentPage - 1})">Previous</button>
+                    <span>Page ${this.currentPage} of ${totalPages}</span>
+                    <button class="btn btn-small" ${this.currentPage === totalPages ? 'disabled' : ''} onclick="window.triageApp.changePage(${this.currentPage + 1})">Next</button>
+                </div>
+            </div>
+        `;
+        
+        container.appendChild(paginationDiv);
+    }
+
+    changePage(newPage) {
+        this.currentPage = newPage;
+        this.updateCurrentTabData();
+    }
+
+    switchTab(tabName) {
+        // Remove active class from all tabs and panels
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.remove('active'));
+        
+        // Add active class to selected tab and panel
+        document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+        document.getElementById(`${tabName}Panel`).classList.add('active');
+        
+        // Reset pagination for new tab
+        this.currentPage = 1;
+        this.updateCurrentTabData();
+    }
+
+    updateCurrentTabData() {
+        // Re-render the current tab with pagination
+        if (this.currentTab === 'processes') {
+            this.populateProcessesTable();
+        } else if (this.currentTab === 'network') {
+            this.populateNetworkTable();
+        } else if (this.currentTab === 'persistence') {
+            this.populatePersistenceTable();
+        } else if (this.currentTab === 'events') {
+            this.populateEventsTable();
+        } else if (this.currentTab === 'execution') {
+            this.populateExecutionEvidence();
+        }
+    }
+
+    validateScanData(data) {
+        const errors = [];
+        const warnings = [];
+        
+        // Check for required structure
+        if (!data || typeof data !== 'object') {
+            errors.push('Invalid data structure');
+            return { valid: false, errors, warnings };
+        }
+        
+        if (!data.scan_metadata) {
+            warnings.push('Missing scan metadata');
+        }
+        
+        if (!data.artifacts) {
+            errors.push('Missing artifacts data');
+            return { valid: false, errors, warnings };
+        }
+        
+        // Validate timestamps (must be between 1970-2100)
+        const minTimestamp = new Date('1970-01-01').getTime();
+        const maxTimestamp = new Date('2100-01-01').getTime();
+        
+        // Check Shimcache entries
+        const shimcache = data.artifacts.execution_evidence?.shimcache_entries || [];
+        shimcache.forEach((entry, idx) => {
+            if (entry.last_modified) {
+                const timestamp = new Date(entry.last_modified).getTime();
+                if (timestamp < minTimestamp || timestamp > maxTimestamp) {
+                    warnings.push(`Shimcache entry ${idx}: Invalid timestamp ${entry.last_modified}`);
+                }
+            }
+            
+            if (entry.path && entry.path.includes('Invalid UTF')) {
+                warnings.push(`Shimcache entry ${idx}: Invalid UTF encoding in path`);
+            }
+            
+            if (entry.file_size && entry.file_size > 1099511627776) { // 1TB
+                warnings.push(`Shimcache entry ${idx}: Suspiciously large file size ${entry.file_size}`);
+            }
+        });
+        
+        // Validate numeric ranges
+        const processes = data.artifacts.running_processes || [];
+        processes.forEach((proc, idx) => {
+            if (proc.pid && (proc.pid < 0 || proc.pid > 100000)) {
+                warnings.push(`Process ${idx}: Invalid PID ${proc.pid}`);
+            }
+        });
+        
+        return {
+            valid: errors.length === 0,
+            errors,
+            warnings
+        };
+    }
+
+    showError(errorInfo) {
+        const modal = document.getElementById('errorModal');
+        document.getElementById('errorCategory').textContent = errorInfo.category || 'Error';
+        document.getElementById('errorMessage').textContent = errorInfo.message || 'An unknown error occurred';
+        document.getElementById('errorRemedy').textContent = 'Suggested action: ' + (errorInfo.remedy || 'Please try again');
+        document.getElementById('errorTechnical').textContent = errorInfo.technical || 'No technical details available';
+        
+        this.lastError = errorInfo; // Store for copy function
+        modal.classList.remove('hidden');
+    }
+
+    copyErrorDetails() {
+        if (!this.lastError) return;
+        
+        const errorText = `
+TriageIR Error Report
+=====================
+Category: ${this.lastError.category}
+Message: ${this.lastError.message}
+Remedy: ${this.lastError.remedy}
+
+Technical Details:
+${this.lastError.technical}
+
+System: ${navigator.userAgent}
+Timestamp: ${new Date().toISOString()}
+        `.trim();
+        
+        navigator.clipboard.writeText(errorText).then(() => {
+            alert('Error details copied to clipboard');
+        }).catch(err => {
+            console.error('Failed to copy error details:', err);
+        });
+    }
+
+    setupAutosave() {
+        // Autosave every 30 seconds if there's scan data
+        setInterval(() => {
+            if (this.currentScanData) {
+                this.autosaveScanData();
+            }
+        }, 30000);
+        
+        // Save on window close
+        window.addEventListener('beforeunload', (e) => {
+            if (this.currentScanData) {
+                this.autosaveScanData();
+                e.preventDefault();
+                e.returnValue = 'You have unsaved scan data. Are you sure you want to exit?';
+            }
+        });
+    }
+
+    autosaveScanData() {
+        if (!this.currentScanData) return;
+        
+        try {
+            const autosaveData = {
+                timestamp: new Date().toISOString(),
+                data: this.currentScanData
+            };
+            localStorage.setItem(this.AUTOSAVE_KEY, JSON.stringify(autosaveData));
+            console.log('Scan data autosaved');
+        } catch (error) {
+            console.error('Failed to autosave:', error);
+        }
+    }
+
+    checkAutosave() {
+        try {
+            const autosaveData = localStorage.getItem(this.AUTOSAVE_KEY);
+            if (autosaveData) {
+                const parsed = JSON.parse(autosaveData);
+                const savedTime = new Date(parsed.timestamp);
+                const now = new Date();
+                const hoursSince = (now - savedTime) / (1000 * 60 * 60);
+                
+                if (hoursSince < 24) {
+                    const restore = confirm(
+                        `Found autosaved scan data from ${savedTime.toLocaleString()}.\n\n` +
+                        `Do you want to restore this session?`
+                    );
+                    
+                    if (restore) {
+                        this.currentScanData = parsed.data;
+                        this.showResultsScreen();
+                    } else {
+                        localStorage.removeItem(this.AUTOSAVE_KEY);
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Failed to check autosave:', error);
+        }
+    }
+
+    populateExecutionEvidence() {
+        // Populate Prefetch table
+        this.populatePrefetchTable();
+        
+        // Populate Shimcache table
+        this.populateShimcacheTable();
+    }
+
+    populatePrefetchTable() {
+        const tableBody = document.getElementById('prefetchTableBody');
+        const prefetch = this.currentScanData?.artifacts?.execution_evidence?.prefetch_files || [];
+        
+        if (prefetch.length === 0) {
+            tableBody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#999;">No prefetch files found</td></tr>';
+            return;
+        }
+        
+        const start = (this.currentPage - 1) * this.itemsPerPage;
+        const end = start + this.itemsPerPage;
+        const pageData = prefetch.slice(start, end);
+        
+        tableBody.innerHTML = pageData.map(file => `
+            <tr>
+                <td>${file.executable_name || 'N/A'}</td>
+                <td>${file.run_count || 'N/A'}</td>
+                <td>${file.last_run_time || 'N/A'}</td>
+                <td title="${file.file_path || ''}">${(file.file_path || 'N/A').substring(0, 80)}${(file.file_path || '').length > 80 ? '...' : ''}</td>
+            </tr>
+        `).join('');
+    }
+
+    populateShimcacheTable() {
+        const tableBody = document.getElementById('shimcacheTableBody');
+        const shimcache = this.currentScanData?.artifacts?.execution_evidence?.shimcache_entries || [];
+        
+        if (shimcache.length === 0) {
+            tableBody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#999;">No shimcache entries found</td></tr>';
+            return;
+        }
+        
+        const start = (this.currentPage - 1) * this.itemsPerPage;
+        const end = start + this.itemsPerPage;
+        const pageData = shimcache.slice(start, end);
+        
+        tableBody.innerHTML = pageData.map(entry => {
+            const executionIcon = entry.execution_flag ? '✅ Yes' : '⚪ No';
+            const fileSize = entry.file_size ? this.formatFileSize(entry.file_size) : 'N/A';
+            
+            return `
+                <tr>
+                    <td title="${entry.path || ''}">${(entry.path || 'N/A').substring(0, 60)}${(entry.path || '').length > 60 ? '...' : ''}</td>
+                    <td>${this.formatTimestamp(entry.last_modified)}</td>
+                    <td>${fileSize}</td>
+                    <td>${executionIcon}</td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        if (bytes > 1099511627776) return (bytes / 1099511627776).toFixed(2) + ' TB';
+        if (bytes > 1073741824) return (bytes / 1073741824).toFixed(2) + ' GB';
+        if (bytes > 1048576) return (bytes / 1048576).toFixed(2) + ' MB';
+        if (bytes > 1024) return (bytes / 1024).toFixed(2) + ' KB';
+        return bytes + ' Bytes';
+    }
+
+    formatTimestamp(timestamp) {
+        if (!timestamp) return 'N/A';
+        try {
+            const date = new Date(timestamp);
+            if (date.getFullYear() < 1970 || date.getFullYear() > 2100) {
+                return '⚠️ Invalid';
+            }
+            return date.toLocaleString();
+        } catch (e) {
+            return '⚠️ Invalid';
+        }
     }
 
     switchTab(tabName) {
@@ -524,5 +962,5 @@ class TriageIRApp {
 
 // Initialize the application when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    new TriageIRApp();
+    window.triageApp = new TriageIRApp();
 });

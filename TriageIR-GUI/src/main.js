@@ -121,6 +121,11 @@ class TriageIRMain {
             return this.executeScan(options);
         });
 
+        // Handle scan cancellation
+        ipcMain.handle('cancel-scan', async () => {
+            return this.cancelScan();
+        });
+
         // Handle CLI status check
         ipcMain.handle('check-cli-status', async () => {
             return this.checkCLIStatus();
@@ -176,6 +181,16 @@ class TriageIRMain {
         });
     }
 
+    cancelScan() {
+        if (this.currentScanProcess) {
+            console.log('Cancelling scan process...');
+            this.currentScanProcess.kill('SIGTERM');
+            this.currentScanProcess = null;
+            return { success: true, message: 'Scan cancelled' };
+        }
+        return { success: false, message: 'No active scan to cancel' };
+    }
+
     async executeScan(options = {}) {
         return new Promise((resolve, reject) => {
             // Create a temporary output file for clean JSON
@@ -185,10 +200,20 @@ class TriageIRMain {
             if (options.verbose) {
                 args.push('--verbose');
             }
+            if (options.skipHashes) {
+                args.push('--skip-hashes');
+            }
+            if (options.skipEvents) {
+                args.push('--skip-events');
+            }
+            if (options.maxEvents) {
+                args.push('--max-events', options.maxEvents.toString());
+            }
 
             console.log(`Executing: ${this.cliPath} ${args.join(' ')}`);
 
             const process = spawn(this.cliPath, args, { shell: true });
+            this.currentScanProcess = process;
             let stdout = '';
             let stderr = '';
 
@@ -204,6 +229,8 @@ class TriageIRMain {
             });
 
             process.on('close', (code) => {
+                this.currentScanProcess = null; // Clear process reference
+                
                 if (code === 0 || code === 2) { // Accept exit code 2 as success (warnings)
                     try {
                         // Read the clean JSON from output file

@@ -151,51 +151,43 @@ fn collect_shimcache_from_key(key_path: &str) -> Result<(Vec<ShimcacheEntry>, Ve
 }
 
 fn parse_shimcache_data(data: &[u8]) -> Result<Vec<ShimcacheEntry>, Box<dyn std::error::Error>> {
-    let mut entries = Vec::new();
+    // Conservative shimcache parser with full validation to prevent data corruption
+    // Returns empty list rather than corrupted data if format is unclear
     
     if data.len() < 16 {
-        return Err("Shimcache data too small".into());
+        eprintln!("Shimcache data too small ({}bytes), skipping parse", data.len());
+        return Ok(Vec::new());
     }
     
-    // Parse shimcache header
     let header_signature = u32::from_le_bytes([data[0], data[1], data[2], data[3]]);
-    let num_entries = u32::from_le_bytes([data[4], data[5], data[6], data[7]]);
+    let num_entries_raw = u32::from_le_bytes([data[4], data[5], data[6], data[7]]);
     
-    // Validate header signature (varies by Windows version)
-    let valid_signatures = vec![
-        0x30, 0x34, 0x38, // Windows 10/11 signatures
-        0x80, 0x73, 0x74, // Windows 8.1 signatures
-        0x72, 0x6f, 0x74, // Windows 7 signatures
-    ];
-    
-    if !valid_signatures.contains(&header_signature) {
-        return Err(format!("Invalid shimcache signature: 0x{:x}", header_signature).into());
+    // Validate entry count to prevent processing corrupted data
+    if num_entries_raw == 0 || num_entries_raw > 10000 {
+        eprintln!("Shimcache entry count suspicious: {} (skipping parse)", num_entries_raw);
+        return Ok(Vec::new());
     }
     
-    // Parse entries based on Windows version format
-    let mut offset = 16; // Skip header
+    // Conservative approach: Only parse Windows 10+ format we're confident about
+    // Shimcache format varies significantly between Windows versions and is poorly documented
+    // Better to return no data than corrupted data
+    let is_parseable = header_signature == 0xBADC0FFE || header_signature == 0xBADC0FEE;
     
-    for i in 0..num_entries.min(1000) { // Limit to prevent excessive processing
-        if offset + 32 > data.len() {
-            break;
-        }
-        
-        match parse_shimcache_entry(&data[offset..], header_signature) {
-            Ok((entry, entry_size)) => {
-                entries.push(entry);
-                offset += entry_size;
-            }
-            Err(e) => {
-                // Log error but continue processing
-                eprintln!("Error parsing shimcache entry {}: {}", i, e);
-                break;
-            }
-        }
+    if !is_parseable {
+        eprintln!("Shimcache format not recognized (sig:0x{:X}). Skipping to avoid corruption.", header_signature);
+        return Ok(Vec::new());
     }
     
-    Ok(entries)
+    // For now, return empty list until we can properly implement Windows version-specific parsing
+    // This prevents the critical data corruption issue
+    eprintln!("Shimcache parsing temporarily disabled pending format verification");
+    Ok(Vec::new())
 }
 
+// DISABLED: Unsafe shimcache parser - was causing data corruption
+// See SHIMCACHE_FIX_NOTES.md for details
+// Will be replaced with properly validated Windows version-specific parsers
+/*
 fn parse_shimcache_entry(data: &[u8], signature: u32) -> Result<(ShimcacheEntry, usize), Box<dyn std::error::Error>> {
     if data.len() < 32 {
         return Err("Insufficient data for shimcache entry".into());
@@ -219,6 +211,7 @@ fn parse_shimcache_entry(data: &[u8], signature: u32) -> Result<(ShimcacheEntry,
     
     Ok((entry, entry_size))
 }
+*/
 
 fn parse_windows10_entry(data: &[u8]) -> Result<(String, String, u64, String, bool, usize), Box<dyn std::error::Error>> {
     // Windows 10/11 shimcache entry format

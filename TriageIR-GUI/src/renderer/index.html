@@ -111,6 +111,7 @@
                             <button class="tab-btn" data-tab="network">Network</button>
                             <button class="tab-btn" data-tab="persistence">Persistence</button>
                             <button class="tab-btn" data-tab="events">Events</button>
+                            <button class="tab-btn" data-tab="execution">Execution Evidence</button>
                         </div>
 
                         <div class="tab-content">
@@ -206,11 +207,116 @@
                                     </table>
                                 </div>
                             </div>
+                            
+                            <div class="tab-panel" id="executionPanel">
+                                <h3>Execution Evidence</h3>
+                                
+                                <div class="execution-section">
+                                    <h4>📝 Prefetch Files</h4>
+                                    <div class="table-container">
+                                        <table class="data-table" id="prefetchTable">
+                                            <thead>
+                                                <tr>
+                                                    <th>Executable Name</th>
+                                                    <th>Run Count</th>
+                                                    <th>Last Run Time</th>
+                                                    <th>File Path</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="prefetchTableBody">
+                                                <!-- Populated by JavaScript -->
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                                
+                                <div class="execution-section">
+                                    <h4>🔍 Shimcache Entries</h4>
+                                    <div class="table-container">
+                                        <table class="data-table" id="shimcacheTable">
+                                            <thead>
+                                                <tr>
+                                                    <th>Path</th>
+                                                    <th>Last Modified</th>
+                                                    <th>File Size</th>
+                                                    <th>Execution Flag</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="shimcacheTableBody">
+                                                <!-- Populated by JavaScript -->
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
         </main>
+
+        <!-- Custom Scan Configuration Modal -->
+        <div class="modal hidden" id="customScanModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>⚙️ Custom Scan Configuration</h3>
+                    <button class="modal-close" id="closeModalBtn">✕</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="skipHashesCheck">
+                            Skip process hash calculation (faster scan)
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="skipEventsCheck">
+                            Skip event log collection
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="verboseCheck" checked>
+                            Verbose logging
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>Event log entry limit:</label>
+                        <input type="number" id="maxEventsInput" value="1000" min="10" max="10000">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" id="cancelConfigBtn">Cancel</button>
+                    <button class="btn btn-primary" id="startConfiguredScanBtn">Start Scan</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Error Display Modal -->
+        <div class="modal hidden" id="errorModal">
+            <div class="modal-content error-modal">
+                <div class="modal-header error-header">
+                    <h3>❌ Scan Error</h3>
+                    <button class="modal-close" id="closeErrorBtn">✕</button>
+                </div>
+                <div class="modal-body">
+                    <div class="error-details">
+                        <div class="error-category" id="errorCategory"></div>
+                        <div class="error-message" id="errorMessage"></div>
+                        <div class="error-remedy" id="errorRemedy"></div>
+                        <details class="error-technical">
+                            <summary>Technical Details</summary>
+                            <pre id="errorTechnical"></pre>
+                        </details>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" id="copyErrorBtn">Copy Error Details</button>
+                    <button class="btn btn-primary" id="closeErrorOkBtn">OK</button>
+                </div>
+            </div>
+        </div>
 
         <!-- Footer -->
         <footer class="app-footer">
