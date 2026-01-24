@@ -21,7 +21,8 @@ class TriageIRApp {
             persistence: { column: null, direction: null },
             events: { column: null, direction: null },
             prefetch: { column: null, direction: null },
-            shimcache: { column: null, direction: null }
+            shimcache: { column: null, direction: null },
+            fileactivity: { column: null, direction: null }
         };
         
         this.init();
@@ -1020,6 +1021,7 @@ class TriageIRApp {
         // Execution evidence search inputs
         const prefetchSearch = document.getElementById('prefetchSearch');
         const shimcacheSearch = document.getElementById('shimcacheSearch');
+        const fileActivitySearch = document.getElementById('fileActivitySearch');
 
         if (prefetchSearch) {
             prefetchSearch.addEventListener('input', this.debounce((e) => {
@@ -1032,11 +1034,25 @@ class TriageIRApp {
                 this.filterShimcache(e.target.value);
             }, 300));
         }
+
+        if (fileActivitySearch) {
+            fileActivitySearch.addEventListener('input', this.debounce((e) => {
+                this.filterFileActivity(e.target.value);
+            }, 300));
+        }
+        
+        // Export buttons
+        const exportFileActivityBtn = document.getElementById('exportFileActivityBtn');
+        if (exportFileActivityBtn) {
+            exportFileActivityBtn.addEventListener('click', () => {
+                this.exportFileActivityToCSV();
+            });
+        }
     }
 
     setupTableSorting() {
         // Set up sorting for all tables
-        const tables = ['processesTable', 'networkTable', 'persistenceTable', 'eventsTable', 'prefetchTable', 'shimcacheTable'];
+        const tables = ['processesTable', 'networkTable', 'persistenceTable', 'eventsTable', 'prefetchTable', 'shimcacheTable', 'fileActivityTable'];
         
         tables.forEach(tableId => {
             const table = document.getElementById(tableId);
@@ -1576,7 +1592,8 @@ class TriageIRApp {
             'persistenceTable': 'persistence',
             'eventsTable': 'events',
             'prefetchTable': 'prefetch',
-            'shimcacheTable': 'shimcache'
+            'shimcacheTable': 'shimcache',
+            'fileActivityTable': 'fileactivity'
         };
         return mapping[tableId] || 'processes';
     }
@@ -1687,6 +1704,9 @@ class TriageIRApp {
                 break;
             case 'shimcache':
                 this.populateShimcacheTable();
+                break;
+            case 'fileactivity':
+                this.populateFileActivityTable();
                 break;
         }
     }
@@ -2136,6 +2156,76 @@ class TriageIRApp {
         this.downloadCSV('shimcache-entries.csv', headers, rows);
     }
 
+    filterFileActivity(searchTerm) {
+        if (!this.currentScanData || !this.currentScanData.artifacts) return;
+        
+        const fileActivity = this.currentScanData.artifacts.file_activity;
+        if (!fileActivity || !fileActivity.activities) return;
+        
+        const filtered = this.filterArray(fileActivity.activities, searchTerm, ['file_path', 'action', 'source', 'file_extension']);
+        
+        this.displayFilteredFileActivity(filtered, fileActivity.activities.length, searchTerm);
+    }
+
+    displayFilteredFileActivity(filtered, total, searchTerm) {
+        const tableBody = document.getElementById('fileActivityTableBody');
+        const warning = document.getElementById('fileActivityWarning');
+        
+        if (filtered.length > this.itemsPerPage) {
+            warning.innerHTML = `<i data-lucide="alert-circle" style="width: 16px; height: 16px;"></i> Displaying ${this.itemsPerPage} of ${filtered.length} ${searchTerm ? 'matching' : ''} activities. ${total > filtered.length ? `(${total} total)` : ''} Use search to filter or export to CSV for complete data.`;
+            warning.classList.remove('hidden');
+        } else if (searchTerm && filtered.length < total) {
+            warning.innerHTML = `<i data-lucide="alert-circle" style="width: 16px; height: 16px;"></i> Showing ${filtered.length} of ${total} activities matching "${searchTerm}".`;
+            warning.classList.remove('hidden');
+        } else {
+            warning.classList.add('hidden');
+        }
+        
+        const displayData = filtered.slice(0, this.itemsPerPage);
+        
+        tableBody.innerHTML = displayData.map(activity => {
+            const actionBadge = this.getActionBadge(activity.action);
+            return `
+                <tr>
+                    <td>${this.formatTimestamp(activity.timestamp)}</td>
+                    <td>${actionBadge}</td>
+                    <td title="${activity.file_path}">${(activity.file_path || 'N/A').substring(0, 80)}${(activity.file_path || '').length > 80 ? '...' : ''}</td>
+                    <td>${activity.file_size ? this.formatFileSize(activity.file_size) : 'N/A'}</td>
+                    <td>${activity.file_extension || 'N/A'}</td>
+                    <td>${activity.source}</td>
+                </tr>
+            `;
+        }).join('');
+        
+        // Reinitialize Lucide icons
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+    }
+
+    exportFileActivityToCSV() {
+        if (!this.currentScanData || !this.currentScanData.artifacts) return;
+        
+        const fileActivity = this.currentScanData.artifacts.file_activity;
+        if (!fileActivity || !fileActivity.activities) {
+            console.warn('No file activity data to export');
+            return;
+        }
+        
+        const headers = ['Timestamp', 'Action', 'File Path', 'Previous Path', 'File Size', 'Extension', 'Source'];
+        const rows = fileActivity.activities.map(activity => [
+            activity.timestamp || '',
+            activity.action || '',
+            activity.file_path || '',
+            activity.previous_path || '',
+            activity.file_size || '',
+            activity.file_extension || '',
+            activity.source || ''
+        ]);
+        
+        this.downloadCSV('file-activity-last-24h.csv', headers, rows);
+    }
+
     downloadCSV(filename, headers, rows) {
         // Escape CSV fields
         const escapeCSV = (field) => {
@@ -2485,6 +2575,120 @@ Timestamp: ${new Date().toISOString()}
         if (typeof lucide !== 'undefined') {
             lucide.createIcons();
         }
+    }
+
+    populateFileActivityTable() {
+        const tableBody = document.getElementById('fileActivityTableBody');
+        const warning = document.getElementById('fileActivityWarning');
+        const statsContainer = document.getElementById('activityStats');
+        const fileActivity = this.currentScanData?.artifacts?.file_activity;
+        
+        if (!fileActivity || !fileActivity.activities || fileActivity.activities.length === 0) {
+            tableBody.innerHTML = `
+                <tr><td colspan="6" style="text-align:center; padding: 40px;">
+                    <i data-lucide="alert-circle" style="width: 32px; height: 32px; color: #999; display: block; margin: 0 auto 12px;"></i>
+                    <p style="color: #999; margin: 0; font-size: 14px;">No file activity found for the last 24 hours</p>
+                    <p style="color: #666; margin: 8px 0 0 0; font-size: 12px;">This feature tracks file creations, modifications, deletions, and downloads</p>
+                </td></tr>
+            `;
+            statsContainer.innerHTML = '';
+            warning.classList.add('hidden');
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
+            return;
+        }
+        
+        // Display activity statistics
+        const activityTypes = fileActivity.activities_by_type || {};
+        const statsHTML = `
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon"><i data-lucide="activity"></i></div>
+                    <div class="stat-content">
+                        <div class="stat-value">${fileActivity.total_activities}</div>
+                        <div class="stat-label">Total Activities</div>
+                    </div>
+                </div>
+                ${Object.entries(activityTypes).map(([action, count]) => `
+                    <div class="stat-card">
+                        <div class="stat-icon">${this.getActionIcon(action)}</div>
+                        <div class="stat-content">
+                            <div class="stat-value">${count}</div>
+                            <div class="stat-label">${action}</div>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+        statsContainer.innerHTML = statsHTML;
+        
+        let activities = [...fileActivity.activities];
+        
+        // Apply sorting if active
+        const sortState = this.sortState.fileactivity;
+        if (sortState && sortState.column && sortState.direction) {
+            const header = document.querySelector(`#fileActivityTable th[data-sort="${sortState.column}"]`);
+            const dataType = header ? header.getAttribute('data-type') : 'string';
+            activities = this.sortData(activities, sortState.column, sortState.direction, dataType);
+        }
+        
+        // Show warning if data is truncated
+        if (activities.length > this.itemsPerPage) {
+            warning.innerHTML = `<i data-lucide="alert-circle" style="width: 16px; height: 16px;"></i> Displaying first ${this.itemsPerPage} of ${activities.length} activities. Use search to filter or export to CSV for complete data.`;
+            warning.classList.remove('hidden');
+        } else {
+            warning.classList.add('hidden');
+        }
+        
+        const start = (this.currentPage - 1) * this.itemsPerPage;
+        const end = start + this.itemsPerPage;
+        const pageData = activities.slice(start, end);
+        
+        tableBody.innerHTML = pageData.map((activity, index) => {
+            const actionBadge = this.getActionBadge(activity.action);
+            return `
+                <tr data-index="${start + index}">
+                    <td>${this.formatTimestamp(activity.timestamp)}</td>
+                    <td>${actionBadge}</td>
+                    <td title="${activity.file_path}">${(activity.file_path || 'N/A').substring(0, 80)}${(activity.file_path || '').length > 80 ? '...' : ''}</td>
+                    <td>${activity.file_size ? this.formatFileSize(activity.file_size) : 'N/A'}</td>
+                    <td>${activity.file_extension || 'N/A'}</td>
+                    <td>${activity.source}</td>
+                </tr>
+            `;
+        }).join('');
+        
+        // Reinitialize Lucide icons
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+    }
+
+    getActionIcon(action) {
+        const icons = {
+            'Created': '<i data-lucide="file-plus"></i>',
+            'Created/Downloaded': '<i data-lucide="download"></i>',
+            'Modified': '<i data-lucide="edit"></i>',
+            'Deleted': '<i data-lucide="trash-2"></i>',
+            'Renamed': '<i data-lucide="file-edit"></i>',
+            'Moved': '<i data-lucide="move"></i>',
+            'Accessed': '<i data-lucide="eye"></i>'
+        };
+        return icons[action] || '<i data-lucide="file"></i>';
+    }
+
+    getActionBadge(action) {
+        const badges = {
+            'Created': '<span class="badge badge-success"><i data-lucide="file-plus" style="width: 12px; height: 12px;"></i> Created</span>',
+            'Created/Downloaded': '<span class="badge badge-info"><i data-lucide="download" style="width: 12px; height: 12px;"></i> Downloaded</span>',
+            'Modified': '<span class="badge badge-warning"><i data-lucide="edit" style="width: 12px; height: 12px;"></i> Modified</span>',
+            'Deleted': '<span class="badge badge-danger"><i data-lucide="trash-2" style="width: 12px; height: 12px;"></i> Deleted</span>',
+            'Renamed': '<span class="badge badge-primary"><i data-lucide="file-edit" style="width: 12px; height: 12px;"></i> Renamed</span>',
+            'Moved': '<span class="badge badge-primary"><i data-lucide="move" style="width: 12px; height: 12px;"></i> Moved</span>',
+            'Accessed': '<span class="badge badge-secondary"><i data-lucide="eye" style="width: 12px; height: 12px;"></i> Accessed</span>'
+        };
+        return badges[action] || `<span class="badge">${action}</span>`;
     }
 
     formatFileSize(bytes) {

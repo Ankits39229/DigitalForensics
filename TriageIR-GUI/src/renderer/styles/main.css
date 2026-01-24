@@ -1548,6 +1548,125 @@ h4 svg {
     color: var(--color-text-primary);
     margin-bottom: var(--spacing-l);
     padding-bottom: var(--spacing-s);
+}
+
+/* Activity Statistics */
+.activity-stats {
+    margin-bottom: var(--spacing-xl);
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--spacing-l);
+    margin-bottom: var(--spacing-xl);
+}
+
+.stat-card {
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-stroke-surface);
+    border-radius: var(--radius-medium);
+    padding: var(--spacing-l);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-m);
+    transition: all var(--duration-fast) var(--easing-standard);
+}
+
+.stat-card:hover {
+    background: var(--color-bg-card-hover);
+    border-color: var(--color-stroke-surface-hover);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-8);
+}
+
+.stat-icon {
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-bg-accent-light);
+    border-radius: var(--radius-small);
+    color: var(--color-accent-primary);
+    flex-shrink: 0;
+}
+
+.stat-icon i {
+    width: 24px;
+    height: 24px;
+}
+
+.stat-content {
+    flex: 1;
+}
+
+.stat-value {
+    font-size: 28px;
+    font-weight: 600;
+    color: var(--color-text-primary);
+    line-height: 1;
+    margin-bottom: var(--spacing-xs);
+}
+
+.stat-label {
+    font-size: var(--font-size-caption);
+    color: var(--color-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Action Badges */
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 12px;
+    border-radius: var(--radius-small);
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.badge-success {
+    background: rgba(16, 124, 16, 0.1);
+    color: #107C10;
+}
+
+.badge-danger {
+    background: rgba(209, 52, 56, 0.1);
+    color: #D13438;
+}
+
+.badge-warning {
+    background: rgba(247, 99, 12, 0.1);
+    color: #F7630C;
+}
+
+.badge-info {
+    background: rgba(0, 120, 212, 0.1);
+    color: #0078D4;
+}
+
+.badge-primary {
+    background: rgba(0, 120, 212, 0.1);
+    color: #0078D4;
+}
+
+.badge-secondary {
+    background: var(--color-bg-subtle);
+    color: var(--color-text-secondary);
+}
+
+.badge i {
+    width: 12px;
+    height: 12px;
+}
+
+.execution-section h4 {
+    color: var(--color-text-primary);
+    margin-bottom: var(--spacing-l);
+    padding-bottom: var(--spacing-s);
     border-bottom: 2px solid var(--color-accent);
     font-size: var(--font-size-body-large);
     font-weight: var(--font-weight-semibold);

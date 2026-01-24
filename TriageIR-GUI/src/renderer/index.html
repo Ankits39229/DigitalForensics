@@ -158,6 +158,7 @@
                             <button class="tab-btn" data-tab="persistence">Persistence</button>
                             <button class="tab-btn" data-tab="events">Events</button>
                             <button class="tab-btn" data-tab="execution">Execution Evidence</button>
+                            <button class="tab-btn" data-tab="fileactivity">File Activity</button>
                         </div>
 
                         <div class="tab-content">
@@ -359,6 +360,46 @@
                                             </tbody>
                                         </table>
                                     </div>
+                                </div>
+                            </div>
+
+                            <!-- File Activity Panel -->
+                            <div class="tab-panel" id="fileactivityPanel">
+                                <div class="panel-header">
+                                    <h3>
+                                        <i data-lucide="clock" style="width: 20px; height: 20px; vertical-align: middle; margin-right: 8px;"></i>
+                                        File Activity (Last 24 Hours)
+                                    </h3>
+                                    <div class="panel-controls">
+                                        <input type="text" id="fileActivitySearch" class="search-input" placeholder="Search file activity...">
+                                        <button class="btn btn-secondary btn-small" id="exportFileActivityBtn">
+                                            <i data-lucide="download" style="width: 14px; height: 14px;"></i>
+                                            Export to CSV
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <div class="activity-stats" id="activityStats">
+                                    <!-- Activity statistics will be populated here -->
+                                </div>
+                                
+                                <div id="fileActivityWarning" class="data-warning hidden"></div>
+                                <div class="table-container">
+                                    <table class="data-table" id="fileActivityTable">
+                                        <thead>
+                                            <tr>
+                                                <th class="sortable" data-sort="timestamp" data-type="string">Timestamp</th>
+                                                <th class="sortable" data-sort="action" data-type="string">Action</th>
+                                                <th class="sortable" data-sort="file_path" data-type="string">File Path</th>
+                                                <th class="sortable" data-sort="file_size" data-type="number">Size</th>
+                                                <th class="sortable" data-sort="file_extension" data-type="string">Extension</th>
+                                                <th class="sortable" data-sort="source" data-type="string">Source</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="fileActivityTableBody">
+                                            <!-- Populated by JavaScript -->
+                                        </tbody>
+                                    </table>
                                 </div>
                             </div>
                         </div>

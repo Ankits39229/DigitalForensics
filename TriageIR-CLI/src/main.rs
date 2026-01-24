@@ -16,6 +16,7 @@ mod logger;
 mod prefetch;
 mod shimcache;
 mod forensic_types;
+mod file_activity;
 
 #[cfg(test)]
 mod integration_tests;
@@ -400,7 +401,36 @@ fn main() {
         println!("✓ Execution evidence collection completed");
     }
     
-    let total_artifacts = processes.len() + network_connections.len() + persistence_mechanisms.len() + total_event_entries + prefetch_files.len() + shimcache_entries.len();
+    // Collect file activity (last 24 hours)
+    logger.info("Starting file activity collection (last 24 hours)");
+    if verbose {
+        println!();
+        println!("⏱ Collecting file activity (last 24 hours)...");
+    }
+    
+    let file_activity_result = file_activity::collect_file_activity(24);
+    let file_activity_data = match file_activity_result {
+        Ok(report) => {
+            logger.info(&format!("File activity collection completed: {} activities found", report.total_activities));
+            if verbose {
+                println!("  ✓ File activity collection completed ({} activities)", report.total_activities);
+                for (action, count) in &report.activities_by_type {
+                    println!("    - {}: {}", action, count);
+                }
+            }
+            Some(report)
+        }
+        Err(e) => {
+            logger.error(&format!("File activity collection failed: {}", e));
+            if verbose {
+                println!("  ✗ File activity collection failed: {}", e);
+            }
+            None
+        }
+    };
+    
+    let total_file_activities = file_activity_data.as_ref().map_or(0, |fa| fa.total_activities);
+    let total_artifacts = processes.len() + network_connections.len() + persistence_mechanisms.len() + total_event_entries + prefetch_files.len() + shimcache_entries.len() + total_file_activities;
     
     let duration = start_time.elapsed();
     logger.info(&format!("Scan completed in {:.2} seconds", duration.as_secs_f64()));
@@ -422,6 +452,7 @@ fn main() {
         println!("✓ Event logs collected ({} entries)", total_event_entries);
         println!("✓ Prefetch files analyzed ({} files)", prefetch_files.len());
         println!("✓ Shimcache entries collected ({} entries)", shimcache_entries.len());
+        println!("✓ File activity tracked ({} activities)", total_file_activities);
         println!();
         
         if log_summary.has_errors() {
@@ -470,7 +501,8 @@ fn main() {
             "execution_evidence": {
                 "prefetch_files": prefetch_files,
                 "shimcache_entries": shimcache_entries
-            }
+            },
+            "file_activity": file_activity_data
         },
         "collection_log": scan_results.collection_log.into_iter().map(|log| {
             json!({

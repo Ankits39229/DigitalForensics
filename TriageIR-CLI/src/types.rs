@@ -91,18 +91,25 @@ pub struct Artifacts {
     pub network_connections: Vec<NetworkConnection>,
     pub persistence_mechanisms: Vec<PersistenceMechanism>,
     pub event_logs: EventLogs,
+    pub file_activity: Option<crate::file_activity::FileActivityReport>,
 }
 
 impl Artifacts {
     /// Get total count of all collected artifacts
     pub fn total_artifact_count(&self) -> usize {
-        self.running_processes.len() +
+        let mut count = self.running_processes.len() +
         self.network_connections.len() +
         self.persistence_mechanisms.len() +
         self.event_logs.security.len() +
         self.event_logs.system.len() +
         self.event_logs.application.len() +
-        self.system_info.logged_on_users.len()
+        self.system_info.logged_on_users.len();
+        
+        if let Some(ref activity) = self.file_activity {
+            count += activity.total_activities;
+        }
+        
+        count
     }
 }
 
