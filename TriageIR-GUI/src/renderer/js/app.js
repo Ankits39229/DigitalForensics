@@ -14,6 +14,16 @@ class TriageIRApp {
         this.AUTOSAVE_KEY = 'triageir_autosave';
         this.RECENT_FILES_KEY = 'triageir_recent_files';
         
+        // Sorting state
+        this.sortState = {
+            processes: { column: null, direction: null },
+            network: { column: null, direction: null },
+            persistence: { column: null, direction: null },
+            events: { column: null, direction: null },
+            prefetch: { column: null, direction: null },
+            shimcache: { column: null, direction: null }
+        };
+        
         this.init();
     }
 
@@ -45,48 +55,24 @@ class TriageIRApp {
         const closeBtn = document.getElementById('closeBtn');
         
         if (minimizeBtn) {
-            // Use capture phase to ensure we catch the event first
-            minimizeBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                e.preventDefault();
+            minimizeBtn.addEventListener('click', () => {
                 console.log('Minimize button clicked');
                 ipcRenderer.send('window-minimize');
-            }, true);
+            });
         }
         
         if (maximizeBtn) {
-            maximizeBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                e.preventDefault();
+            maximizeBtn.addEventListener('click', () => {
                 console.log('Maximize button clicked');
                 ipcRenderer.send('window-maximize');
-            }, true);
+            });
         }
         
         if (closeBtn) {
-            // Multiple event handlers for redundancy
-            closeBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                e.preventDefault();
+            closeBtn.addEventListener('click', () => {
                 console.log('Close button clicked');
                 ipcRenderer.send('window-close');
-            }, true);
-            
-            // Backup handler for mousedown
-            closeBtn.addEventListener('mousedown', (e) => {
-                if (e.button === 0) { // Left click only
-                    e.stopPropagation();
-                    e.preventDefault();
-                }
-            }, true);
-            
-            // Backup handler for mouseup
-            closeBtn.addEventListener('mouseup', (e) => {
-                if (e.button === 0) { // Left click only
-                    console.log('Close button mouseup (backup handler)');
-                    ipcRenderer.send('window-close');
-                }
-            }, true);
+            });
         } else {
             console.error('Close button not found in DOM');
         }
@@ -647,6 +633,15 @@ class TriageIRApp {
         
         // Populate events table
         this.populateEventsTable();
+        
+        // Populate execution evidence (prefetch and shimcache)
+        this.populateExecutionEvidence();
+        
+        // Setup search and export listeners
+        this.setupSearchListeners();
+        
+        // Setup table sorting
+        this.setupTableSorting();
     }
 
     populateSummaryCards() {
@@ -732,14 +727,31 @@ class TriageIRApp {
 
     populateProcessesTable() {
         const tableBody = document.getElementById('processesTableBody');
-        const processes = this.currentScanData.artifacts?.running_processes || [];
+        const warning = document.getElementById('processesWarning');
+        let processes = this.currentScanData.artifacts?.running_processes || [];
+        
+        // Apply sorting if active
+        const sortState = this.sortState.processes;
+        if (sortState.column && sortState.direction) {
+            const header = document.querySelector(`#processesTable th[data-sort="${sortState.column}"]`);
+            const dataType = header ? header.getAttribute('data-type') : 'string';
+            processes = this.sortData(processes, sortState.column, sortState.direction, dataType);
+        }
+        
+        // Show warning if data is truncated
+        if (processes.length > this.itemsPerPage) {
+            warning.innerHTML = `<i data-lucide="alert-circle" style="width: 16px; height: 16px;"></i> Displaying first ${this.itemsPerPage} of ${processes.length} processes. Use search to filter or export to CSV for complete data.`;
+            warning.classList.remove('hidden');
+        } else {
+            warning.classList.add('hidden');
+        }
         
         const start = (this.currentPage - 1) * this.itemsPerPage;
         const end = start + this.itemsPerPage;
         const pageData = processes.slice(start, end);
         
-        tableBody.innerHTML = pageData.map(proc => `
-            <tr>
+        tableBody.innerHTML = pageData.map((proc, index) => `
+            <tr data-index="${start + index}">
                 <td>${proc.pid || 'N/A'}</td>
                 <td>${proc.name || 'N/A'}</td>
                 <td>${proc.user || 'N/A'}</td>
@@ -748,19 +760,41 @@ class TriageIRApp {
             </tr>
         `).join('');
         
+        // Reinitialize Lucide icons
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+        
         this.addPaginationInfo('processesTable', processes.length);
     }
 
     populateNetworkTable() {
         const tableBody = document.getElementById('networkTableBody');
-        const connections = this.currentScanData.artifacts?.network_connections || [];
+        const warning = document.getElementById('networkWarning');
+        let connections = this.currentScanData.artifacts?.network_connections || [];
+        
+        // Apply sorting if active
+        const sortState = this.sortState.network;
+        if (sortState.column && sortState.direction) {
+            const header = document.querySelector(`#networkTable th[data-sort="${sortState.column}"]`);
+            const dataType = header ? header.getAttribute('data-type') : 'string';
+            connections = this.sortData(connections, sortState.column, sortState.direction, dataType);
+        }
+        
+        // Show warning if data is truncated
+        if (connections.length > this.itemsPerPage) {
+            warning.innerHTML = `<i data-lucide="alert-circle" style="width: 16px; height: 16px;"></i> Displaying first ${this.itemsPerPage} of ${connections.length} connections. Use search to filter or export to CSV for complete data.`;
+            warning.classList.remove('hidden');
+        } else {
+            warning.classList.add('hidden');
+        }
         
         const start = (this.currentPage - 1) * this.itemsPerPage;
         const end = start + this.itemsPerPage;
         const pageData = connections.slice(start, end);
         
-        tableBody.innerHTML = pageData.map(conn => `
-            <tr>
+        tableBody.innerHTML = pageData.map((conn, index) => `
+            <tr data-index="${start + index}">
                 <td>${conn.protocol || 'N/A'}</td>
                 <td>${conn.local_address || 'N/A'}</td>
                 <td>${conn.local_port || 'N/A'}</td>
@@ -771,23 +805,45 @@ class TriageIRApp {
             </tr>
         `).join('');
         
+        // Reinitialize Lucide icons
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+        
         this.addPaginationInfo('networkTable', connections.length);
     }
 
     populatePersistenceTable() {
         const tableBody = document.getElementById('persistenceTableBody');
-        const persistence = this.currentScanData.artifacts?.persistence_mechanisms || [];
+        const warning = document.getElementById('persistenceWarning');
+        let persistence = this.currentScanData.artifacts?.persistence_mechanisms || [];
+        
+        // Apply sorting if active
+        const sortState = this.sortState.persistence;
+        if (sortState.column && sortState.direction) {
+            const header = document.querySelector(`#persistenceTable th[data-sort="${sortState.column}"]`);
+            const dataType = header ? header.getAttribute('data-type') : 'string';
+            persistence = this.sortData(persistence, sortState.column, sortState.direction, dataType);
+        }
+        
+        // Show warning if data is truncated
+        if (persistence.length > this.itemsPerPage) {
+            warning.innerHTML = `<i data-lucide="alert-circle" style="width: 16px; height: 16px;"></i> Displaying first ${this.itemsPerPage} of ${persistence.length} items. Use search to filter or export to CSV for complete data.`;
+            warning.classList.remove('hidden');
+        } else {
+            warning.classList.add('hidden');
+        }
         
         const start = (this.currentPage - 1) * this.itemsPerPage;
         const end = start + this.itemsPerPage;
         const pageData = persistence.slice(start, end);
         
-        tableBody.innerHTML = pageData.map(item => {
+        tableBody.innerHTML = pageData.map((item, index) => {
             const suspiciousIcon = item.is_suspicious 
                 ? '<i data-lucide="alert-triangle" style="width: 14px; height: 14px; color: #F7630C;"></i> Yes' 
                 : '<i data-lucide="check" style="width: 14px; height: 14px; color: #107C10;"></i> No';
             return `
-                <tr>
+                <tr data-index="${start + index}">
                     <td>${item.type || 'N/A'}</td>
                     <td>${item.name || 'N/A'}</td>
                     <td>${item.location || 'N/A'}</td>
@@ -801,27 +857,48 @@ class TriageIRApp {
         if (typeof lucide !== 'undefined') {
             lucide.createIcons();
         }
+        // Reinitialize Lucide icons
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
         
         this.addPaginationInfo('persistenceTable', persistence.length);
     }
 
     populateEventsTable() {
         const tableBody = document.getElementById('eventsTableBody');
+        const warning = document.getElementById('eventsWarning');
         const eventLogs = this.currentScanData.artifacts?.event_logs || {};
         
         // Combine all event log categories into a single array
-        const allEvents = [
+        let allEvents = [
             ...(eventLogs.application || []).map(event => ({ ...event, log_name: 'Application' })),
             ...(eventLogs.security || []).map(event => ({ ...event, log_name: 'Security' })),
             ...(eventLogs.system || []).map(event => ({ ...event, log_name: 'System' }))
         ];
         
+        // Apply sorting if active
+        const sortState = this.sortState.events;
+        if (sortState.column && sortState.direction) {
+            const header = document.querySelector(`#eventsTable th[data-sort="${sortState.column}"]`);
+            const dataType = header ? header.getAttribute('data-type') : 'string';
+            allEvents = this.sortData(allEvents, sortState.column, sortState.direction, dataType);
+        }
+        
+        // Show warning if data is truncated
+        if (allEvents.length > this.itemsPerPage) {
+            warning.innerHTML = `<i data-lucide="alert-circle" style="width: 16px; height: 16px;"></i> Displaying first ${this.itemsPerPage} of ${allEvents.length} events. Use search to filter or export to CSV for complete data.`;
+            warning.classList.remove('hidden');
+        } else {
+            warning.classList.add('hidden');
+        }
+        
         const start = (this.currentPage - 1) * this.itemsPerPage;
         const end = start + this.itemsPerPage;
         const pageData = allEvents.slice(start, end);
         
-        tableBody.innerHTML = pageData.map(event => `
-            <tr>
+        tableBody.innerHTML = pageData.map((event, index) => `
+            <tr data-index="${start + index}">
                 <td>${event.log_name || 'N/A'}</td>
                 <td>${event.event_id || 'N/A'}</td>
                 <td>${event.level || 'N/A'}</td>
@@ -831,6 +908,10 @@ class TriageIRApp {
             </tr>
         `).join('');
         
+        // Reinitialize Lucide icons
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
         this.addPaginationInfo('eventsTable', allEvents.length);
     }
 
@@ -869,6 +950,1220 @@ class TriageIRApp {
     changePage(newPage) {
         this.currentPage = newPage;
         this.updateCurrentTabData();
+    }
+
+    // Search and Filter Functionality
+    setupSearchListeners() {
+        const processSearch = document.getElementById('processSearch');
+        const networkSearch = document.getElementById('networkSearch');
+        const persistenceSearch = document.getElementById('persistenceSearch');
+        const eventsSearch = document.getElementById('eventsSearch');
+
+        if (processSearch) {
+            processSearch.addEventListener('input', this.debounce((e) => {
+                this.filterProcesses(e.target.value);
+            }, 300));
+        }
+
+        if (networkSearch) {
+            networkSearch.addEventListener('input', this.debounce((e) => {
+                this.filterNetwork(e.target.value);
+            }, 300));
+        }
+
+        if (persistenceSearch) {
+            persistenceSearch.addEventListener('input', this.debounce((e) => {
+                this.filterPersistence(e.target.value);
+            }, 300));
+        }
+
+        if (eventsSearch) {
+            eventsSearch.addEventListener('input', this.debounce((e) => {
+                this.filterEvents(e.target.value);
+            }, 300));
+        }
+
+        // Export button listeners
+        const exportProcessesBtn = document.getElementById('exportProcessesBtn');
+        const exportNetworkBtn = document.getElementById('exportNetworkBtn');
+        const exportPersistenceBtn = document.getElementById('exportPersistenceBtn');
+        const exportEventsBtn = document.getElementById('exportEventsBtn');
+
+        if (exportProcessesBtn) {
+            exportProcessesBtn.addEventListener('click', () => this.exportProcessesToCSV());
+        }
+
+        if (exportNetworkBtn) {
+            exportNetworkBtn.addEventListener('click', () => this.exportNetworkToCSV());
+        }
+
+        if (exportPersistenceBtn) {
+            exportPersistenceBtn.addEventListener('click', () => this.exportPersistenceToCSV());
+        }
+
+        if (exportEventsBtn) {
+            exportEventsBtn.addEventListener('click', () => this.exportEventsToCSV());
+        }
+
+        // Execution evidence export buttons
+        const exportPrefetchBtn = document.getElementById('exportPrefetchBtn');
+        const exportShimcacheBtn = document.getElementById('exportShimcacheBtn');
+
+        if (exportPrefetchBtn) {
+            exportPrefetchBtn.addEventListener('click', () => this.exportPrefetchToCSV());
+        }
+
+        if (exportShimcacheBtn) {
+            exportShimcacheBtn.addEventListener('click', () => this.exportShimcacheToCSV());
+        }
+
+        // Execution evidence search inputs
+        const prefetchSearch = document.getElementById('prefetchSearch');
+        const shimcacheSearch = document.getElementById('shimcacheSearch');
+
+        if (prefetchSearch) {
+            prefetchSearch.addEventListener('input', this.debounce((e) => {
+                this.filterPrefetch(e.target.value);
+            }, 300));
+        }
+
+        if (shimcacheSearch) {
+            shimcacheSearch.addEventListener('input', this.debounce((e) => {
+                this.filterShimcache(e.target.value);
+            }, 300));
+        }
+    }
+
+    setupTableSorting() {
+        // Set up sorting for all tables
+        const tables = ['processesTable', 'networkTable', 'persistenceTable', 'eventsTable', 'prefetchTable', 'shimcacheTable'];
+        
+        tables.forEach(tableId => {
+            const table = document.getElementById(tableId);
+            if (!table) return;
+            
+            const headers = table.querySelectorAll('thead th.sortable');
+            headers.forEach(header => {
+                header.addEventListener('click', (e) => {
+                    const sortColumn = header.getAttribute('data-sort');
+                    const sortType = header.getAttribute('data-type');
+                    const tableType = this.getTableType(tableId);
+                    
+                    this.sortTable(tableType, sortColumn, sortType);
+                });
+            });
+        });
+        
+        // Set up expandable rows
+        this.setupExpandableRows();
+        
+        // Set up context menu
+        this.setupContextMenu();
+    }
+    
+    setupExpandableRows() {
+        const tables = ['processesTable', 'networkTable', 'persistenceTable', 'eventsTable', 'prefetchTable', 'shimcacheTable'];
+        
+        tables.forEach(tableId => {
+            const table = document.getElementById(tableId);
+            if (!table) return;
+            
+            const tbody = table.querySelector('tbody');
+            if (!tbody) return;
+            
+            tbody.addEventListener('click', (e) => {
+                // Find the clicked row (skip if clicking detail row or copyable element)
+                const row = e.target.closest('tr');
+                if (!row || row.classList.contains('detail-row') || e.target.closest('.copyable')) {
+                    return;
+                }
+                
+                const tableType = this.getTableType(tableId);
+                this.toggleRowExpansion(row, tableType);
+            });
+        });
+    }
+    
+    toggleRowExpansion(row, tableType) {
+        const isExpanded = row.classList.contains('expanded');
+        
+        if (isExpanded) {
+            // Collapse the row
+            row.classList.remove('expanded');
+            const detailRow = row.nextElementSibling;
+            if (detailRow && detailRow.classList.contains('detail-row')) {
+                detailRow.remove();
+            }
+        } else {
+            // Expand the row
+            row.classList.add('expanded');
+            
+            // Get row data
+            const rowIndex = parseInt(row.getAttribute('data-index'));
+            let rowData = null;
+            
+            switch(tableType) {
+                case 'processes':
+                    rowData = this.currentScanData?.artifacts?.running_processes?.[rowIndex];
+                    break;
+                case 'network':
+                    rowData = this.currentScanData?.artifacts?.network_connections?.[rowIndex];
+                    break;
+                case 'persistence':
+                    rowData = this.currentScanData?.artifacts?.persistence_mechanisms?.[rowIndex];
+                    break;
+                case 'events':
+                    // Events are combined from multiple sources, need to recalculate
+                    const eventLogs = this.currentScanData?.artifacts?.event_logs || {};
+                    const allEvents = [
+                        ...(eventLogs.application || []).map(event => ({ ...event, log_name: 'Application' })),
+                        ...(eventLogs.security || []).map(event => ({ ...event, log_name: 'Security' })),
+                        ...(eventLogs.system || []).map(event => ({ ...event, log_name: 'System' }))
+                    ];
+                    // Apply sorting if active
+                    const eventSortState = this.sortState.events;
+                    if (eventSortState.column && eventSortState.direction) {
+                        const header = document.querySelector(`#eventsTable th[data-sort="${eventSortState.column}"]`);
+                        const dataType = header ? header.getAttribute('data-type') : 'string';
+                        const sortedEvents = this.sortData(allEvents, eventSortState.column, eventSortState.direction, dataType);
+                        rowData = sortedEvents[rowIndex];
+                    } else {
+                        rowData = allEvents[rowIndex];
+                    }
+                    break;
+                case 'prefetch':
+                    rowData = this.currentScanData?.artifacts?.execution_evidence?.prefetch_files?.[rowIndex];
+                    break;
+                case 'shimcache':
+                    // Shimcache needs filtered data
+                    const shimcache = this.currentScanData?.artifacts?.execution_evidence?.shimcache_entries || [];
+                    let validShimcache = shimcache.filter(entry => {
+                        if (!entry.path || entry.path.trim() === '' || entry.path === 'Invalid UTF-16') return false;
+                        if (entry.file_size && entry.file_size > 1099511627776) return false;
+                        if (entry.last_modified && entry.last_modified.includes('+') && parseInt(entry.last_modified.substring(1, 6)) > 3000) return false;
+                        return true;
+                    });
+                    // Apply sorting if active
+                    const shimSortState = this.sortState.shimcache;
+                    if (shimSortState.column && shimSortState.direction) {
+                        const header = document.querySelector(`#shimcacheTable th[data-sort="${shimSortState.column}"]`);
+                        const dataType = header ? header.getAttribute('data-type') : 'string';
+                        validShimcache = this.sortData(validShimcache, shimSortState.column, shimSortState.direction, dataType);
+                    }
+                    rowData = validShimcache[rowIndex];
+                    break;
+            }
+            
+            if (rowData) {
+                const detailRow = this.buildDetailRow(rowData, tableType, row.cells.length);
+                row.insertAdjacentHTML('afterend', detailRow);
+                
+                // Add copy listeners to copyable fields in detail row
+                const nextRow = row.nextElementSibling;
+                if (nextRow) {
+                    nextRow.querySelectorAll('.copyable').forEach(el => {
+                        el.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            this.copyToClipboard(el.textContent, el);
+                        });
+                    });
+                }
+                
+                // Reinitialize Lucide icons
+                if (typeof lucide !== 'undefined') {
+                    lucide.createIcons();
+                }
+            }
+        }
+    }
+    
+    buildDetailRow(data, tableType, colSpan) {
+        let detailHTML = `<tr class="detail-row"><td colspan="${colSpan}"><div class="detail-content">`;
+        
+        switch(tableType) {
+            case 'processes':
+                detailHTML += this.buildProcessDetails(data);
+                break;
+            case 'network':
+                detailHTML += this.buildNetworkDetails(data);
+                break;
+            case 'persistence':
+                detailHTML += this.buildPersistenceDetails(data);
+                break;
+            case 'events':
+                detailHTML += this.buildEventDetails(data);
+                break;
+            case 'prefetch':
+                detailHTML += this.buildPrefetchDetails(data);
+                break;
+            case 'shimcache':
+                detailHTML += this.buildShimcacheDetails(data);
+                break;
+        }
+        
+        detailHTML += `</div></td></tr>`;
+        return detailHTML;
+    }
+    
+    buildProcessDetails(proc) {
+        const escapeHtml = (text) => {
+            const div = document.createElement('div');
+            div.textContent = text || '';
+            return div.innerHTML;
+        };
+        
+        return `
+            <div class="detail-section">
+                <h4>Process Information</h4>
+                <div class="detail-field">
+                    <span class="detail-label">Full Command Line:</span>
+                    <span class="detail-value copyable">${escapeHtml(proc.command_line)}</span>
+                </div>
+                <div class="detail-field">
+                    <span class="detail-label">Executable Path:</span>
+                    <span class="detail-value copyable">${escapeHtml(proc.path)}</span>
+                </div>
+                <div class="detail-field">
+                    <span class="detail-label">Process ID:</span>
+                    <span class="detail-value copyable">${proc.pid}</span>
+                </div>
+                <div class="detail-field">
+                    <span class="detail-label">Parent PID:</span>
+                    <span class="detail-value copyable">${proc.parent_pid || 'N/A'}</span>
+                </div>
+            </div>
+            ${proc.hashes ? `
+            <div class="detail-section">
+                <h4>Hashes</h4>
+                <div class="detail-field">
+                    <span class="detail-label">MD5:</span>
+                    <span class="detail-value copyable">${escapeHtml(proc.hashes.md5 || 'N/A')}</span>
+                </div>
+                <div class="detail-field">
+                    <span class="detail-label">SHA1:</span>
+                    <span class="detail-value copyable">${escapeHtml(proc.hashes.sha1 || 'N/A')}</span>
+                </div>
+                <div class="detail-field">
+                    <span class="detail-label">SHA256:</span>
+                    <span class="detail-value copyable">${escapeHtml(proc.hashes.sha256 || 'N/A')}</span>
+                </div>
+            </div>
+            ` : ''}
+            ${proc.memory ? `
+            <div class="detail-section">
+                <h4>Memory Usage</h4>
+                <div class="detail-field">
+                    <span class="detail-label">Working Set:</span>
+                    <span class="detail-value">${this.formatBytes(proc.memory.working_set)}</span>
+                </div>
+                <div class="detail-field">
+                    <span class="detail-label">Private Memory:</span>
+                    <span class="detail-value">${this.formatBytes(proc.memory.private_memory)}</span>
+                </div>
+            </div>
+            ` : ''}
+        `;
+    }
+    
+    buildNetworkDetails(conn) {
+        const escapeHtml = (text) => {
+            const div = document.createElement('div');
+            div.textContent = text || '';
+            return div.innerHTML;
+        };
+        
+        return `
+            <div class="detail-section">
+                <h4>Connection Information</h4>
+                <div class="detail-field">
+                    <span class="detail-label">Local Address:</span>
+                    <span class="detail-value copyable">${escapeHtml(conn.local_address)}:${conn.local_port}</span>
+                </div>
+                <div class="detail-field">
+                    <span class="detail-label">Remote Address:</span>
+                    <span class="detail-value copyable">${escapeHtml(conn.remote_address)}:${conn.remote_port}</span>
+                </div>
+                <div class="detail-field">
+                    <span class="detail-label">Protocol:</span>
+                    <span class="detail-value">${conn.protocol}</span>
+                </div>
+                <div class="detail-field">
+                    <span class="detail-label">State:</span>
+                    <span class="detail-value">${conn.state}</span>
+                </div>
+            </div>
+            <div class="detail-section">
+                <h4>Process Information</h4>
+                <div class="detail-field">
+                    <span class="detail-label">Process ID:</span>
+                    <span class="detail-value copyable">${conn.pid}</span>
+                </div>
+                <div class="detail-field">
+                    <span class="detail-label">Process Name:</span>
+                    <span class="detail-value copyable">${escapeHtml(conn.process_name || 'N/A')}</span>
+                </div>
+            </div>
+        `;
+    }
+    
+    buildPersistenceDetails(item) {
+        const escapeHtml = (text) => {
+            const div = document.createElement('div');
+            div.textContent = text || '';
+            return div.innerHTML;
+        };
+        
+        return `
+            <div class="detail-section">
+                <h4>Persistence Mechanism</h4>
+                <div class="detail-field">
+                    <span class="detail-label">Full Location:</span>
+                    <span class="detail-value copyable">${escapeHtml(item.location)}</span>
+                </div>
+                <div class="detail-field">
+                    <span class="detail-label">Complete Value:</span>
+                    <span class="detail-value copyable">${escapeHtml(item.value)}</span>
+                </div>
+                <div class="detail-field">
+                    <span class="detail-label">Entry Name:</span>
+                    <span class="detail-value copyable">${escapeHtml(item.name)}</span>
+                </div>
+                <div class="detail-field">
+                    <span class="detail-label">Category:</span>
+                    <span class="detail-value">${escapeHtml(item.category)}</span>
+                </div>
+                ${item.suspicious ? `
+                <div class="detail-field">
+                    <span class="detail-label">Suspicious Indicators:</span>
+                    <span class="detail-value" style="color: var(--color-status-danger);">
+                        <i data-lucide="alert-triangle" style="width: 14px; height: 14px;"></i>
+                        Flagged as suspicious
+                    </span>
+                </div>
+                ` : ''}
+            </div>
+        `;
+    }
+    
+    buildEventDetails(event) {
+        const escapeHtml = (text) => {
+            const div = document.createElement('div');
+            div.textContent = text || '';
+            return div.innerHTML;
+        };
+        
+        return `
+            <div class="detail-section">
+                <h4>Event Information</h4>
+                <div class="detail-field">
+                    <span class="detail-label">Event ID:</span>
+                    <span class="detail-value copyable">${event.event_id}</span>
+                </div>
+                <div class="detail-field">
+                    <span class="detail-label">Source:</span>
+                    <span class="detail-value">${escapeHtml(event.source)}</span>
+                </div>
+                <div class="detail-field">
+                    <span class="detail-label">Timestamp:</span>
+                    <span class="detail-value copyable">${escapeHtml(event.timestamp)}</span>
+                </div>
+                <div class="detail-field">
+                    <span class="detail-label">Level:</span>
+                    <span class="detail-value">${escapeHtml(event.level)}</span>
+                </div>
+            </div>
+            <div class="detail-section">
+                <h4>Message</h4>
+                <div class="detail-field">
+                    <span class="detail-value copyable" style="grid-column: 1 / -1; white-space: pre-wrap; word-break: break-word;">${escapeHtml(event.message)}</span>
+                </div>
+            </div>
+        `;
+    }
+    
+    buildPrefetchDetails(entry) {
+        const escapeHtml = (text) => {
+            const div = document.createElement('div');
+            div.textContent = text || '';
+            return div.innerHTML;
+        };
+        
+        return `
+            <div class="detail-section">
+                <h4>Prefetch Information</h4>
+                <div class="detail-field">
+                    <span class="detail-label">Full Path:</span>
+                    <span class="detail-value copyable">${escapeHtml(entry.file_path)}</span>
+                </div>
+                <div class="detail-field">
+                    <span class="detail-label">Executable Name:</span>
+                    <span class="detail-value copyable">${escapeHtml(entry.executable_name)}</span>
+                </div>
+                <div class="detail-field">
+                    <span class="detail-label">Run Count:</span>
+                    <span class="detail-value">${entry.run_count || 'N/A'}</span>
+                </div>
+                <div class="detail-field">
+                    <span class="detail-label">Last Run Time:</span>
+                    <span class="detail-value copyable">${escapeHtml(entry.last_run_time || 'N/A')}</span>
+                </div>
+            </div>
+            ${entry.referenced_files && entry.referenced_files.length > 0 ? `
+            <div class="detail-section">
+                <h4>Referenced Files (${entry.referenced_files.length})</h4>
+                <div class="detail-field" style="grid-column: 1 / -1;">
+                    <ul style="margin: 0; padding-left: 20px; max-height: 200px; overflow-y: auto;">
+                        ${entry.referenced_files.slice(0, 20).map(file => `<li class="copyable" style="margin: 4px 0;">${escapeHtml(file)}</li>`).join('')}
+                        ${entry.referenced_files.length > 20 ? `<li style="color: var(--color-text-secondary); font-style: italic;">... and ${entry.referenced_files.length - 20} more files</li>` : ''}
+                    </ul>
+                </div>
+            </div>
+            ` : ''}
+        `;
+    }
+    
+    buildShimcacheDetails(entry) {
+        const escapeHtml = (text) => {
+            const div = document.createElement('div');
+            div.textContent = text || '';
+            return div.innerHTML;
+        };
+        
+        return `
+            <div class="detail-section">
+                <h4>Shimcache Entry</h4>
+                <div class="detail-field">
+                    <span class="detail-label">Full Path:</span>
+                    <span class="detail-value copyable">${escapeHtml(entry.path)}</span>
+                </div>
+                <div class="detail-field">
+                    <span class="detail-label">Last Modified:</span>
+                    <span class="detail-value copyable">${escapeHtml(entry.last_modified || 'N/A')}</span>
+                </div>
+                <div class="detail-field">
+                    <span class="detail-label">File Size:</span>
+                    <span class="detail-value">${entry.file_size ? this.formatBytes(entry.file_size) : 'N/A'}</span>
+                </div>
+                <div class="detail-field">
+                    <span class="detail-label">Execution Flag:</span>
+                    <span class="detail-value">${entry.execution_flag !== undefined ? (entry.execution_flag ? 'Yes' : 'No') : 'N/A'}</span>
+                </div>
+            </div>
+        `;
+    }
+    
+    setupContextMenu() {
+        const contextMenu = document.getElementById('contextMenu');
+        if (!contextMenu) return;
+        
+        let currentTarget = null;
+        
+        // Add context menu to all table rows
+        const tables = ['processesTable', 'networkTable', 'persistenceTable', 'eventsTable', 'prefetchTable', 'shimcacheTable'];
+        
+        tables.forEach(tableId => {
+            const table = document.getElementById(tableId);
+            if (!table) return;
+            
+            const tbody = table.querySelector('tbody');
+            if (!tbody) return;
+            
+            tbody.addEventListener('contextmenu', (e) => {
+                const row = e.target.closest('tr:not(.detail-row)');
+                if (!row) return;
+                
+                e.preventDefault();
+                currentTarget = e.target;
+                
+                // Position context menu
+                contextMenu.style.left = `${e.pageX}px`;
+                contextMenu.style.top = `${e.pageY}px`;
+                contextMenu.classList.add('active');
+            });
+        });
+        
+        // Also add context menu to copyable fields in detail rows
+        document.addEventListener('contextmenu', (e) => {
+            if (e.target.closest('.copyable')) {
+                e.preventDefault();
+                currentTarget = e.target;
+                
+                contextMenu.style.left = `${e.pageX}px`;
+                contextMenu.style.top = `${e.pageY}px`;
+                contextMenu.classList.add('active');
+            }
+        });
+        
+        // Handle context menu clicks
+        contextMenu.addEventListener('click', (e) => {
+            const item = e.target.closest('.context-menu-item');
+            if (!item) return;
+            
+            const action = item.getAttribute('data-action');
+            
+            switch(action) {
+                case 'copy-value':
+                    if (currentTarget) {
+                        const value = currentTarget.textContent.trim();
+                        this.copyToClipboard(value, currentTarget);
+                    }
+                    break;
+                    
+                case 'copy-row':
+                    if (currentTarget) {
+                        const row = currentTarget.closest('tr');
+                        if (row) {
+                            const cells = Array.from(row.cells).map(cell => cell.textContent.trim());
+                            this.copyToClipboard(cells.join(' | '), currentTarget);
+                        }
+                    }
+                    break;
+                    
+                case 'search-online':
+                    if (currentTarget) {
+                        const value = currentTarget.textContent.trim();
+                        require('electron').shell.openExternal(`https://www.google.com/search?q=${encodeURIComponent(value)}`);
+                    }
+                    break;
+                    
+                case 'virustotal':
+                    if (currentTarget) {
+                        const value = currentTarget.textContent.trim();
+                        // Check if it looks like a hash (32, 40, or 64 hex characters)
+                        if (/^[a-fA-F0-9]{32,64}$/.test(value)) {
+                            require('electron').shell.openExternal(`https://www.virustotal.com/gui/search/${value}`);
+                        } else {
+                            require('electron').shell.openExternal(`https://www.virustotal.com/gui/search/${encodeURIComponent(value)}`);
+                        }
+                    }
+                    break;
+            }
+            
+            contextMenu.classList.remove('active');
+        });
+        
+        // Close context menu when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.context-menu')) {
+                contextMenu.classList.remove('active');
+            }
+        });
+    }
+    
+    copyToClipboard(text, element) {
+        if (!text) return;
+        
+        navigator.clipboard.writeText(text).then(() => {
+            // Add visual feedback
+            if (element) {
+                element.classList.add('copied');
+                setTimeout(() => {
+                    element.classList.remove('copied');
+                }, 2000);
+            }
+            
+            console.log('Copied to clipboard:', text.substring(0, 50) + (text.length > 50 ? '...' : ''));
+        }).catch(err => {
+            console.error('Failed to copy:', err);
+        });
+    }
+
+
+    getTableType(tableId) {
+        const mapping = {
+            'processesTable': 'processes',
+            'networkTable': 'network',
+            'persistenceTable': 'persistence',
+            'eventsTable': 'events',
+            'prefetchTable': 'prefetch',
+            'shimcacheTable': 'shimcache'
+        };
+        return mapping[tableId] || 'processes';
+    }
+
+    sortTable(tableType, column, dataType) {
+        const currentSort = this.sortState[tableType];
+        
+        // Toggle sort direction
+        if (currentSort.column === column) {
+            if (currentSort.direction === 'asc') {
+                currentSort.direction = 'desc';
+            } else if (currentSort.direction === 'desc') {
+                currentSort.direction = null;
+                currentSort.column = null;
+            } else {
+                currentSort.direction = 'asc';
+            }
+        } else {
+            currentSort.column = column;
+            currentSort.direction = 'asc';
+        }
+        
+        // Update UI to show sort indicators
+        this.updateSortIndicators(tableType);
+        
+        // Re-render the table with sorted data
+        this.updateTableWithSort(tableType);
+    }
+
+    updateSortIndicators(tableType) {
+        const tableIds = {
+            'processes': 'processesTable',
+            'network': 'networkTable',
+            'persistence': 'persistenceTable',
+            'events': 'eventsTable',
+            'prefetch': 'prefetchTable',
+            'shimcache': 'shimcacheTable'
+        };
+        
+        const tableId = tableIds[tableType];
+        const table = document.getElementById(tableId);
+        if (!table) return;
+        
+        const headers = table.querySelectorAll('thead th.sortable');
+        const currentSort = this.sortState[tableType];
+        
+        headers.forEach(header => {
+            const column = header.getAttribute('data-sort');
+            header.classList.remove('sorted-asc', 'sorted-desc');
+            
+            if (column === currentSort.column) {
+                if (currentSort.direction === 'asc') {
+                    header.classList.add('sorted-asc');
+                } else if (currentSort.direction === 'desc') {
+                    header.classList.add('sorted-desc');
+                }
+            }
+        });
+    }
+
+    sortData(data, column, direction, dataType) {
+        if (!direction || !column) return data;
+        
+        return [...data].sort((a, b) => {
+            let aVal = a[column];
+            let bVal = b[column];
+            
+            // Handle null/undefined
+            if (aVal === null || aVal === undefined) aVal = '';
+            if (bVal === null || bVal === undefined) bVal = '';
+            
+            let comparison = 0;
+            
+            if (dataType === 'number') {
+                const aNum = parseFloat(aVal) || 0;
+                const bNum = parseFloat(bVal) || 0;
+                comparison = aNum - bNum;
+            } else if (dataType === 'boolean') {
+                const aBool = aVal ? 1 : 0;
+                const bBool = bVal ? 1 : 0;
+                comparison = aBool - bBool;
+            } else {
+                // String comparison
+                comparison = String(aVal).toLowerCase().localeCompare(String(bVal).toLowerCase());
+            }
+            
+            return direction === 'asc' ? comparison : -comparison;
+        });
+    }
+
+    updateTableWithSort(tableType) {
+        // Trigger re-render of the appropriate table
+        switch(tableType) {
+            case 'processes':
+                this.populateProcessesTable();
+                break;
+            case 'network':
+                this.populateNetworkTable();
+                break;
+            case 'persistence':
+                this.populatePersistenceTable();
+                break;
+            case 'events':
+                this.populateEventsTable();
+                break;
+            case 'prefetch':
+                this.populatePrefetchTable();
+                break;
+            case 'shimcache':
+                this.populateShimcacheTable();
+                break;
+        }
+    }
+
+    debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
+
+    filterProcesses(searchTerm) {
+        if (!this.currentScanData || !this.currentScanData.artifacts) return;
+        
+        const processes = this.currentScanData.artifacts.running_processes || [];
+        const filtered = this.filterArray(processes, searchTerm, ['name', 'user', 'pid', 'command_line']);
+        
+        this.displayFilteredProcesses(filtered, processes.length, searchTerm);
+    }
+
+    filterNetwork(searchTerm) {
+        if (!this.currentScanData || !this.currentScanData.artifacts) return;
+        
+        const connections = this.currentScanData.artifacts.network_connections || [];
+        const filtered = this.filterArray(connections, searchTerm, ['protocol', 'local_address', 'remote_address', 'state', 'process_name']);
+        
+        this.displayFilteredNetwork(filtered, connections.length, searchTerm);
+    }
+
+    filterPersistence(searchTerm) {
+        if (!this.currentScanData || !this.currentScanData.artifacts) return;
+        
+        const items = this.currentScanData.artifacts.persistence_mechanisms || [];
+        const filtered = this.filterArray(items, searchTerm, ['type', 'name', 'value', 'location']);
+        
+        this.displayFilteredPersistence(filtered, items.length, searchTerm);
+    }
+
+    filterEvents(searchTerm) {
+        if (!this.currentScanData || !this.currentScanData.artifacts) return;
+        
+        const eventLogs = this.currentScanData.artifacts.event_logs || {};
+        
+        // Combine all event log categories into a single array
+        const allEvents = [
+            ...(eventLogs.application || []).map(event => ({ ...event, log_name: 'Application' })),
+            ...(eventLogs.security || []).map(event => ({ ...event, log_name: 'Security' })),
+            ...(eventLogs.system || []).map(event => ({ ...event, log_name: 'System' }))
+        ];
+        
+        const filtered = this.filterArray(allEvents, searchTerm, ['event_id', 'level', 'source', 'message', 'log_name']);
+        
+        this.displayFilteredEvents(filtered, allEvents.length, searchTerm);
+    }
+
+    filterPrefetch(searchTerm) {
+        if (!this.currentScanData || !this.currentScanData.artifacts) return;
+        
+        const prefetch = this.currentScanData.artifacts.execution_evidence?.prefetch_files || [];
+        const filtered = this.filterArray(prefetch, searchTerm, ['executable_name', 'file_path']);
+        
+        this.displayFilteredPrefetch(filtered, prefetch.length, searchTerm);
+    }
+
+    filterShimcache(searchTerm) {
+        if (!this.currentScanData || !this.currentScanData.artifacts) return;
+        
+        const shimcache = this.currentScanData.artifacts.execution_evidence?.shimcache_entries || [];
+        
+        // Filter out corrupt entries first
+        const validShimcache = shimcache.filter(entry => {
+            if (!entry.path || entry.path.trim() === '' || entry.path === 'Invalid UTF-16') return false;
+            if (entry.file_size && entry.file_size > 1099511627776) return false;
+            if (entry.last_modified && entry.last_modified.includes('+') && parseInt(entry.last_modified.substring(1, 6)) > 3000) return false;
+            return true;
+        });
+        
+        const filtered = this.filterArray(validShimcache, searchTerm, ['path']);
+        
+        this.displayFilteredShimcache(filtered, validShimcache.length, searchTerm, shimcache.length);
+    }
+
+    filterArray(array, searchTerm, fields) {
+        if (!searchTerm || searchTerm.trim() === '') {
+            return array;
+        }
+        
+        const term = searchTerm.toLowerCase();
+        return array.filter(item => {
+            return fields.some(field => {
+                const value = item[field];
+                if (value === null || value === undefined) return false;
+                return String(value).toLowerCase().includes(term);
+            });
+        });
+    }
+
+    displayFilteredProcesses(filtered, total, searchTerm) {
+        const tableBody = document.getElementById('processesTableBody');
+        const warning = document.getElementById('processesWarning');
+        
+        // Show warning if data is truncated
+        if (filtered.length > this.itemsPerPage) {
+            warning.innerHTML = `<i data-lucide="alert-circle" style="width: 16px; height: 16px;"></i> Displaying ${this.itemsPerPage} of ${filtered.length} ${searchTerm ? 'matching' : ''} processes. ${total > filtered.length ? `(${total} total)` : ''} Use search to filter or export to CSV for complete data.`;
+            warning.classList.remove('hidden');
+        } else if (searchTerm && filtered.length < total) {
+            warning.innerHTML = `<i data-lucide="alert-circle" style="width: 16px; height: 16px;"></i> Showing ${filtered.length} of ${total} processes matching "${searchTerm}".`;
+            warning.classList.remove('hidden');
+        } else {
+            warning.classList.add('hidden');
+        }
+        
+        const displayData = filtered.slice(0, this.itemsPerPage);
+        
+        tableBody.innerHTML = displayData.map(proc => `
+            <tr>
+                <td>${proc.pid || 'N/A'}</td>
+                <td>${proc.name || 'N/A'}</td>
+                <td>${proc.user || 'N/A'}</td>
+                <td>${proc.memory_usage_mb ? proc.memory_usage_mb.toFixed(1) : 'N/A'}</td>
+                <td title="${proc.command_line || ''}">${(proc.command_line || '').substring(0, 50)}${(proc.command_line || '').length > 50 ? '...' : ''}</td>
+            </tr>
+        `).join('');
+        
+        // Reinitialize Lucide icons
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+    }
+
+    displayFilteredNetwork(filtered, total, searchTerm) {
+        const tableBody = document.getElementById('networkTableBody');
+        const warning = document.getElementById('networkWarning');
+        
+        if (filtered.length > this.itemsPerPage) {
+            warning.innerHTML = `<i data-lucide="alert-circle" style="width: 16px; height: 16px;"></i> Displaying ${this.itemsPerPage} of ${filtered.length} ${searchTerm ? 'matching' : ''} connections. ${total > filtered.length ? `(${total} total)` : ''} Use search to filter or export to CSV for complete data.`;
+            warning.classList.remove('hidden');
+        } else if (searchTerm && filtered.length < total) {
+            warning.innerHTML = `<i data-lucide="alert-circle" style="width: 16px; height: 16px;"></i> Showing ${filtered.length} of ${total} connections matching "${searchTerm}".`;
+            warning.classList.remove('hidden');
+        } else {
+            warning.classList.add('hidden');
+        }
+        
+        const displayData = filtered.slice(0, this.itemsPerPage);
+        
+        tableBody.innerHTML = displayData.map(conn => `
+            <tr>
+                <td>${conn.protocol || 'N/A'}</td>
+                <td>${conn.local_address || 'N/A'}</td>
+                <td>${conn.local_port || 'N/A'}</td>
+                <td>${conn.remote_address || 'N/A'}</td>
+                <td>${conn.remote_port || 'N/A'}</td>
+                <td>${conn.state || 'N/A'}</td>
+                <td>${conn.pid || conn.process_name || 'N/A'}</td>
+            </tr>
+        `).join('');
+        
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+    }
+
+    displayFilteredPersistence(filtered, total, searchTerm) {
+        const tableBody = document.getElementById('persistenceTableBody');
+        const warning = document.getElementById('persistenceWarning');
+        
+        if (filtered.length > this.itemsPerPage) {
+            warning.innerHTML = `<i data-lucide="alert-circle" style="width: 16px; height: 16px;"></i> Displaying ${this.itemsPerPage} of ${filtered.length} ${searchTerm ? 'matching' : ''} items. ${total > filtered.length ? `(${total} total)` : ''} Use search to filter or export to CSV for complete data.`;
+            warning.classList.remove('hidden');
+        } else if (searchTerm && filtered.length < total) {
+            warning.innerHTML = `<i data-lucide="alert-circle" style="width: 16px; height: 16px;"></i> Showing ${filtered.length} of ${total} items matching "${searchTerm}".`;
+            warning.classList.remove('hidden');
+        } else {
+            warning.classList.add('hidden');
+        }
+        
+        const displayData = filtered.slice(0, this.itemsPerPage);
+        
+        tableBody.innerHTML = displayData.map(item => `
+            <tr>
+                <td>${item.type || 'N/A'}</td>
+                <td>${item.name || 'N/A'}</td>
+                <td title="${item.value || ''}">${(item.value || '').substring(0, 100)}${(item.value || '').length > 100 ? '...' : ''}</td>
+                <td>${item.location || 'N/A'}</td>
+                <td><span class="badge ${item.suspicious ? 'badge-critical' : 'badge-normal'}">${item.suspicious ? 'Yes' : 'No'}</span></td>
+            </tr>
+        `).join('');
+        
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+    }
+
+    displayFilteredEvents(filtered, total, searchTerm) {
+        const tableBody = document.getElementById('eventsTableBody');
+        const warning = document.getElementById('eventsWarning');
+        
+        if (filtered.length > this.itemsPerPage) {
+            warning.innerHTML = `<i data-lucide="alert-circle" style="width: 16px; height: 16px;"></i> Displaying ${this.itemsPerPage} of ${filtered.length} ${searchTerm ? 'matching' : ''} events. ${total > filtered.length ? `(${total} total)` : ''} Use search to filter or export to CSV for complete data.`;
+            warning.classList.remove('hidden');
+        } else if (searchTerm && filtered.length < total) {
+            warning.innerHTML = `<i data-lucide="alert-circle" style="width: 16px; height: 16px;"></i> Showing ${filtered.length} of ${total} events matching "${searchTerm}".`;
+            warning.classList.remove('hidden');
+        } else {
+            warning.classList.add('hidden');
+        }
+        
+        const displayData = filtered.slice(0, this.itemsPerPage);
+        
+        tableBody.innerHTML = displayData.map(event => `
+            <tr>
+                <td>${event.event_id || 'N/A'}</td>
+                <td><span class="badge ${this.getLevelBadgeClass(event.level)}">${event.level || 'N/A'}</span></td>
+                <td>${event.source || 'N/A'}</td>
+                <td>${event.time_created || 'N/A'}</td>
+                <td title="${event.message || ''}">${(event.message || '').substring(0, 100)}${(event.message || '').length > 100 ? '...' : ''}</td>
+            </tr>
+        `).join('');
+        
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+    }
+
+    displayFilteredPrefetch(filtered, total, searchTerm) {
+        const tableBody = document.getElementById('prefetchTableBody');
+        const warning = document.getElementById('prefetchWarning');
+        
+        if (filtered.length === 0 && total === 0) {
+            tableBody.innerHTML = `
+                <tr><td colspan="4" style="text-align:center; padding: 40px;">
+                    <i data-lucide="alert-circle" style="width: 32px; height: 32px; color: #999; display: block; margin: 0 auto 12px;"></i>
+                    <p style="color: #999; margin: 0; font-size: 14px;">No prefetch files found</p>
+                    <p style="color: #666; margin: 8px 0 0 0; font-size: 12px;">This may occur if prefetch is disabled or if the CLI couldn't access C:\\\\Windows\\\\Prefetch</p>
+                </td></tr>
+            `;
+            warning.classList.add('hidden');
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
+            return;
+        }
+        
+        if (filtered.length > this.itemsPerPage) {
+            warning.innerHTML = `<i data-lucide="alert-circle" style="width: 16px; height: 16px;"></i> Displaying ${this.itemsPerPage} of ${filtered.length} ${searchTerm ? 'matching' : ''} prefetch files. ${total > filtered.length ? `(${total} total)` : ''} Use search to filter or export to CSV for complete data.`;
+            warning.classList.remove('hidden');
+        } else if (searchTerm && filtered.length < total) {
+            warning.innerHTML = `<i data-lucide="alert-circle" style="width: 16px; height: 16px;"></i> Showing ${filtered.length} of ${total} prefetch files matching "${searchTerm}".`;
+            warning.classList.remove('hidden');
+        } else {
+            warning.classList.add('hidden');
+        }
+        
+        const displayData = filtered.slice(0, this.itemsPerPage);
+        
+        tableBody.innerHTML = displayData.map(file => `
+            <tr>
+                <td>${file.executable_name || 'N/A'}</td>
+                <td>${file.run_count || 'N/A'}</td>
+                <td>${file.last_run_time || 'N/A'}</td>
+                <td title="${file.file_path || ''}">${(file.file_path || 'N/A').substring(0, 80)}${(file.file_path || '').length > 80 ? '...' : ''}</td>
+            </tr>
+        `).join('');
+        
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+    }
+
+    displayFilteredShimcache(filtered, total, searchTerm, originalTotal) {
+        const tableBody = document.getElementById('shimcacheTableBody');
+        const warning = document.getElementById('shimcacheWarning');
+        
+        if (filtered.length === 0 && total === 0) {
+            tableBody.innerHTML = `
+                <tr><td colspan="4" style="text-align:center; padding: 40px;">
+                    <i data-lucide="alert-circle" style="width: 32px; height: 32px; color: #999; display: block; margin: 0 auto 12px;"></i>
+                    <p style="color: #999; margin: 0; font-size: 14px;">No valid shimcache entries found</p>
+                    <p style="color: #666; margin: 8px 0 0 0; font-size: 12px;">${originalTotal > 0 ? 'All entries appear to be corrupted or invalid' : 'The shimcache registry key may be empty or inaccessible'}</p>
+                </td></tr>
+            `;
+            warning.classList.add('hidden');
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
+            return;
+        }
+        
+        let warningMsg = '';
+        if (filtered.length > this.itemsPerPage) {
+            warningMsg = `<i data-lucide="alert-circle" style="width: 16px; height: 16px;"></i> Displaying ${this.itemsPerPage} of ${filtered.length} ${searchTerm ? 'matching' : ''} shimcache entries. ${total > filtered.length ? `(${total} valid, ${originalTotal - total} corrupt filtered out)` : originalTotal > total ? `(${originalTotal - total} corrupt entries filtered out)` : ''} Use search to filter or export to CSV for complete data.`;
+            warning.innerHTML = warningMsg;
+            warning.classList.remove('hidden');
+        } else if (searchTerm && filtered.length < total) {
+            warningMsg = `<i data-lucide="alert-circle" style="width: 16px; height: 16px;"></i> Showing ${filtered.length} of ${total} shimcache entries matching "${searchTerm}".`;
+            warning.innerHTML = warningMsg;
+            warning.classList.remove('hidden');
+        } else if (originalTotal > total) {
+            warningMsg = `<i data-lucide="alert-circle" style="width: 16px; height: 16px;"></i> ${originalTotal - total} corrupt entries were filtered out. Showing ${total} valid entries.`;
+            warning.innerHTML = warningMsg;
+            warning.classList.remove('hidden');
+        } else {
+            warning.classList.add('hidden');
+        }
+        
+        const displayData = filtered.slice(0, this.itemsPerPage);
+        
+        tableBody.innerHTML = displayData.map(entry => {
+            const executionIcon = entry.execution_flag 
+                ? '<i data-lucide="check-circle" style="width: 14px; height: 14px; color: #107C10;"></i> Yes' 
+                : '<i data-lucide="circle" style="width: 14px; height: 14px; color: #999;"></i> No';
+            const fileSize = entry.file_size ? this.formatFileSize(entry.file_size) : 'N/A';
+            
+            return `
+                <tr>
+                    <td title="${entry.path || ''}">${(entry.path || 'N/A').substring(0, 60)}${(entry.path || '').length > 60 ? '...' : ''}</td>
+                    <td>${this.formatTimestamp(entry.last_modified)}</td>
+                    <td>${fileSize}</td>
+                    <td>${executionIcon}</td>
+                </tr>
+            `;
+        }).join('');
+        
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+    }
+
+    // CSV Export Functions
+    exportProcessesToCSV() {
+        if (!this.currentScanData || !this.currentScanData.artifacts) return;
+        
+        const processes = this.currentScanData.artifacts.running_processes || [];
+        const headers = ['PID', 'Process Name', 'User', 'Memory (MB)', 'Command Line'];
+        const rows = processes.map(proc => [
+            proc.pid || '',
+            proc.name || '',
+            proc.user || '',
+            proc.memory_usage_mb ? proc.memory_usage_mb.toFixed(1) : '',
+            proc.command_line || ''
+        ]);
+        
+        this.downloadCSV('processes.csv', headers, rows);
+    }
+
+    exportNetworkToCSV() {
+        if (!this.currentScanData || !this.currentScanData.artifacts) return;
+        
+        const connections = this.currentScanData.artifacts.network_connections || [];
+        const headers = ['Protocol', 'Local Address', 'Local Port', 'Remote Address', 'Remote Port', 'State', 'Process'];
+        const rows = connections.map(conn => [
+            conn.protocol || '',
+            conn.local_address || '',
+            conn.local_port || '',
+            conn.remote_address || '',
+            conn.remote_port || '',
+            conn.state || '',
+            conn.pid || conn.process_name || ''
+        ]);
+        
+        this.downloadCSV('network-connections.csv', headers, rows);
+    }
+
+    exportPersistenceToCSV() {
+        if (!this.currentScanData || !this.currentScanData.artifacts) return;
+        
+        const items = this.currentScanData.artifacts.persistence_mechanisms || [];
+        const headers = ['Type', 'Name', 'Value', 'Location', 'Suspicious'];
+        const rows = items.map(item => [
+            item.type || '',
+            item.name || '',
+            item.value || '',
+            item.location || '',
+            item.suspicious ? 'Yes' : 'No'
+        ]);
+        
+        this.downloadCSV('persistence-mechanisms.csv', headers, rows);
+    }
+
+    exportEventsToCSV() {
+        if (!this.currentScanData || !this.currentScanData.artifacts) return;
+        
+        const eventLogs = this.currentScanData.artifacts.event_logs || {};
+        
+        // Combine all event log categories into a single array
+        const allEvents = [
+            ...(eventLogs.application || []).map(event => ({ ...event, log_name: 'Application' })),
+            ...(eventLogs.security || []).map(event => ({ ...event, log_name: 'Security' })),
+            ...(eventLogs.system || []).map(event => ({ ...event, log_name: 'System' }))
+        ];
+        
+        const headers = ['Log Name', 'Event ID', 'Level', 'Source', 'Timestamp', 'Message'];
+        const rows = allEvents.map(event => [
+            event.log_name || '',
+            event.event_id || '',
+            event.level || '',
+            event.source || '',
+            event.timestamp || '',
+            event.message || ''
+        ]);
+        
+        this.downloadCSV('event-logs.csv', headers, rows);
+    }
+
+    exportPrefetchToCSV() {
+        if (!this.currentScanData || !this.currentScanData.artifacts) return;
+        
+        const prefetch = this.currentScanData.artifacts.execution_evidence?.prefetch_files || [];
+        const headers = ['Executable Name', 'Run Count', 'Last Run Time', 'File Path'];
+        const rows = prefetch.map(file => [
+            file.executable_name || '',
+            file.run_count || '',
+            file.last_run_time || '',
+            file.file_path || ''
+        ]);
+        
+        this.downloadCSV('prefetch-files.csv', headers, rows);
+    }
+
+    exportShimcacheToCSV() {
+        if (!this.currentScanData || !this.currentScanData.artifacts) return;
+        
+        const shimcache = this.currentScanData.artifacts.execution_evidence?.shimcache_entries || [];
+        
+        // Filter out corrupt entries
+        const validShimcache = shimcache.filter(entry => {
+            if (!entry.path || entry.path.trim() === '' || entry.path === 'Invalid UTF-16') return false;
+            if (entry.file_size && entry.file_size > 1099511627776) return false;
+            if (entry.last_modified && entry.last_modified.includes('+') && parseInt(entry.last_modified.substring(1, 6)) > 3000) return false;
+            return true;
+        });
+        
+        const headers = ['Path', 'Last Modified', 'File Size', 'Execution Flag'];
+        const rows = validShimcache.map(entry => [
+            entry.path || '',
+            entry.last_modified || '',
+            entry.file_size || '',
+            entry.execution_flag ? 'Yes' : 'No'
+        ]);
+        
+        this.downloadCSV('shimcache-entries.csv', headers, rows);
+    }
+
+    downloadCSV(filename, headers, rows) {
+        // Escape CSV fields
+        const escapeCSV = (field) => {
+            if (field === null || field === undefined) return '';
+            const str = String(field);
+            if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+                return `"${str.replace(/"/g, '""')}"`;
+            }
+            return str;
+        };
+        
+        // Build CSV content
+        let csvContent = headers.map(escapeCSV).join(',') + '\n';
+        rows.forEach(row => {
+            csvContent += row.map(escapeCSV).join(',') + '\n';
+        });
+        
+        // Create blob and download
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        
+        link.setAttribute('href', url);
+        link.setAttribute('download', filename);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     }
 
     switchTab(tabName) {
@@ -1063,46 +2358,121 @@ Timestamp: ${new Date().toISOString()}
 
     populatePrefetchTable() {
         const tableBody = document.getElementById('prefetchTableBody');
-        const prefetch = this.currentScanData?.artifacts?.execution_evidence?.prefetch_files || [];
+        const warning = document.getElementById('prefetchWarning');
+        let prefetch = this.currentScanData?.artifacts?.execution_evidence?.prefetch_files || [];
         
         if (prefetch.length === 0) {
-            tableBody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#999;">No prefetch files found</td></tr>';
+            tableBody.innerHTML = `
+                <tr><td colspan="4" style="text-align:center; padding: 40px;">
+                    <i data-lucide="alert-circle" style="width: 32px; height: 32px; color: #999; display: block; margin: 0 auto 12px;"></i>
+                    <p style="color: #999; margin: 0; font-size: 14px;">No prefetch files found</p>
+                    <p style="color: #666; margin: 8px 0 0 0; font-size: 12px;">This may occur if prefetch is disabled or if the CLI couldn't access C:\\Windows\\Prefetch</p>
+                </td></tr>
+            `;
+            warning.classList.add('hidden');
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
             return;
+        }
+        
+        // Apply sorting if active
+        const sortState = this.sortState.prefetch;
+        if (sortState.column && sortState.direction) {
+            const header = document.querySelector(`#prefetchTable th[data-sort="${sortState.column}"]`);
+            const dataType = header ? header.getAttribute('data-type') : 'string';
+            prefetch = this.sortData(prefetch, sortState.column, sortState.direction, dataType);
+        }
+        
+        // Show warning if data is truncated
+        if (prefetch.length > this.itemsPerPage) {
+            warning.innerHTML = `<i data-lucide="alert-circle" style="width: 16px; height: 16px;"></i> Displaying first ${this.itemsPerPage} of ${prefetch.length} prefetch files. Use search to filter or export to CSV for complete data.`;
+            warning.classList.remove('hidden');
+        } else {
+            warning.classList.add('hidden');
         }
         
         const start = (this.currentPage - 1) * this.itemsPerPage;
         const end = start + this.itemsPerPage;
         const pageData = prefetch.slice(start, end);
         
-        tableBody.innerHTML = pageData.map(file => `
-            <tr>
+        tableBody.innerHTML = pageData.map((file, index) => `
+            <tr data-index="${start + index}">
                 <td>${file.executable_name || 'N/A'}</td>
                 <td>${file.run_count || 'N/A'}</td>
                 <td>${file.last_run_time || 'N/A'}</td>
                 <td title="${file.file_path || ''}">${(file.file_path || 'N/A').substring(0, 80)}${(file.file_path || '').length > 80 ? '...' : ''}</td>
             </tr>
         `).join('');
+        
+        // Reinitialize Lucide icons
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
     }
 
     populateShimcacheTable() {
         const tableBody = document.getElementById('shimcacheTableBody');
+        const warning = document.getElementById('shimcacheWarning');
         const shimcache = this.currentScanData?.artifacts?.execution_evidence?.shimcache_entries || [];
         
-        if (shimcache.length === 0) {
-            tableBody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#999;">No shimcache entries found</td></tr>';
+        // Filter out obviously corrupt entries (invalid paths, unrealistic dates/sizes)
+        let validShimcache = shimcache.filter(entry => {
+            // Filter out entries with empty paths or "Invalid UTF-16"
+            if (!entry.path || entry.path.trim() === '' || entry.path === 'Invalid UTF-16') return false;
+            // Filter out entries with unrealistic file sizes (> 1TB = 1099511627776 bytes)
+            if (entry.file_size && entry.file_size > 1099511627776) return false;
+            // Filter out entries with dates far in the future (> year 3000)
+            if (entry.last_modified && entry.last_modified.includes('+') && parseInt(entry.last_modified.substring(1, 6)) > 3000) return false;
+            return true;
+        });
+        
+        if (validShimcache.length === 0) {
+            tableBody.innerHTML = `
+                <tr><td colspan="4" style="text-align:center; padding: 40px;">
+                    <i data-lucide="alert-circle" style="width: 32px; height: 32px; color: #999; display: block; margin: 0 auto 12px;"></i>
+                    <p style="color: #999; margin: 0; font-size: 14px;">No valid shimcache entries found</p>
+                    <p style="color: #666; margin: 8px 0 0 0; font-size: 12px;">${shimcache.length > 0 ? 'All entries appear to be corrupted or invalid' : 'The shimcache registry key may be empty or inaccessible'}</p>
+                </td></tr>
+            `;
+            warning.classList.add('hidden');
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
             return;
+        }
+        
+        // Apply sorting if active
+        const sortState = this.sortState.shimcache;
+        if (sortState.column && sortState.direction) {
+            const header = document.querySelector(`#shimcacheTable th[data-sort="${sortState.column}"]`);
+            const dataType = header ? header.getAttribute('data-type') : 'string';
+            validShimcache = this.sortData(validShimcache, sortState.column, sortState.direction, dataType);
+        }
+        
+        // Show warning if data is truncated
+        if (validShimcache.length > this.itemsPerPage) {
+            warning.innerHTML = `<i data-lucide="alert-circle" style="width: 16px; height: 16px;"></i> Displaying first ${this.itemsPerPage} of ${validShimcache.length} shimcache entries. ${shimcache.length > validShimcache.length ? `(${shimcache.length - validShimcache.length} corrupt entries filtered out)` : ''} Use search to filter or export to CSV for complete data.`;
+            warning.classList.remove('hidden');
+        } else if (shimcache.length > validShimcache.length) {
+            warning.innerHTML = `<i data-lucide="alert-circle" style="width: 16px; height: 16px;"></i> ${shimcache.length - validShimcache.length} corrupt entries were filtered out. Showing ${validShimcache.length} valid entries.`;
+            warning.classList.remove('hidden');
+        } else {
+            warning.classList.add('hidden');
         }
         
         const start = (this.currentPage - 1) * this.itemsPerPage;
         const end = start + this.itemsPerPage;
-        const pageData = shimcache.slice(start, end);
+        const pageData = validShimcache.slice(start, end);
         
-        tableBody.innerHTML = pageData.map(entry => {
-            const executionIcon = entry.execution_flag ? '✅ Yes' : '⚪ No';
+        tableBody.innerHTML = pageData.map((entry, index) => {
+            const executionIcon = entry.execution_flag 
+                ? '<i data-lucide="check-circle" style="width: 14px; height: 14px; color: #107C10;"></i> Yes' 
+                : '<i data-lucide="circle" style="width: 14px; height: 14px; color: #999;"></i> No';
             const fileSize = entry.file_size ? this.formatFileSize(entry.file_size) : 'N/A';
             
             return `
-                <tr>
+                <tr data-index="${start + index}">
                     <td title="${entry.path || ''}">${(entry.path || 'N/A').substring(0, 60)}${(entry.path || '').length > 60 ? '...' : ''}</td>
                     <td>${this.formatTimestamp(entry.last_modified)}</td>
                     <td>${fileSize}</td>
@@ -1110,6 +2480,11 @@ Timestamp: ${new Date().toISOString()}
                 </tr>
             `;
         }).join('');
+        
+        // Reinitialize Lucide icons
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
     }
 
     formatFileSize(bytes) {

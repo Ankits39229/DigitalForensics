@@ -20,13 +20,13 @@
                 <div class="titlebar-title">TriageIR - Digital Forensics Triage Tool</div>
             </div>
             <div class="titlebar-controls">
-                <button class="titlebar-button" id="minimizeBtn" title="Minimize" onclick="require('electron').ipcRenderer.send('window-minimize')">
+                <button class="titlebar-button" id="minimizeBtn" title="Minimize">
                     <i data-lucide="minus" style="width: 12px; height: 12px;"></i>
                 </button>
-                <button class="titlebar-button" id="maximizeBtn" title="Maximize" onclick="require('electron').ipcRenderer.send('window-maximize')">
+                <button class="titlebar-button" id="maximizeBtn" title="Maximize">
                     <i data-lucide="square" style="width: 12px; height: 12px;"></i>
                 </button>
-                <button class="titlebar-button titlebar-close" id="closeBtn" title="Close" onclick="require('electron').ipcRenderer.send('window-close')">
+                <button class="titlebar-button titlebar-close" id="closeBtn" title="Close">
                     <i data-lucide="x" style="width: 12px; height: 12px;"></i>
                 </button>
             </div>
@@ -172,16 +172,26 @@
                             </div>
                             
                             <div class="tab-panel" id="processesPanel">
-                                <h3>Running Processes</h3>
+                                <div class="panel-header">
+                                    <h3>Running Processes</h3>
+                                    <div class="panel-controls">
+                                        <input type="text" id="processSearch" class="search-input" placeholder="Search processes...">
+                                        <button class="btn btn-secondary btn-small" id="exportProcessesBtn">
+                                            <i data-lucide="download" style="width: 14px; height: 14px;"></i>
+                                            Export to CSV
+                                        </button>
+                                    </div>
+                                </div>
+                                <div id="processesWarning" class="data-warning hidden"></div>
                                 <div class="table-container">
                                     <table class="data-table" id="processesTable">
                                         <thead>
                                             <tr>
-                                                <th>PID</th>
-                                                <th>Name</th>
-                                                <th>User</th>
-                                                <th>Memory (MB)</th>
-                                                <th>Command Line</th>
+                                                <th class="sortable" data-sort="pid" data-type="number">PID</th>
+                                                <th class="sortable" data-sort="name" data-type="string">Name</th>
+                                                <th class="sortable" data-sort="user" data-type="string">User</th>
+                                                <th class="sortable" data-sort="memory_usage_mb" data-type="number">Memory (MB)</th>
+                                                <th class="sortable" data-sort="command_line" data-type="string">Command Line</th>
                                             </tr>
                                         </thead>
                                         <tbody id="processesTableBody">
@@ -192,18 +202,28 @@
                             </div>
                             
                             <div class="tab-panel" id="networkPanel">
-                                <h3>Network Connections</h3>
+                                <div class="panel-header">
+                                    <h3>Network Connections</h3>
+                                    <div class="panel-controls">
+                                        <input type="text" id="networkSearch" class="search-input" placeholder="Search connections...">
+                                        <button class="btn btn-secondary btn-small" id="exportNetworkBtn">
+                                            <i data-lucide="download" style="width: 14px; height: 14px;"></i>
+                                            Export to CSV
+                                        </button>
+                                    </div>
+                                </div>
+                                <div id="networkWarning" class="data-warning hidden"></div>
                                 <div class="table-container">
                                     <table class="data-table" id="networkTable">
                                         <thead>
                                             <tr>
-                                                <th>Protocol</th>
-                                                <th>Local Address</th>
-                                                <th>Local Port</th>
-                                                <th>Remote Address</th>
-                                                <th>Remote Port</th>
-                                                <th>State</th>
-                                                <th>Process</th>
+                                                <th class="sortable" data-sort="protocol" data-type="string">Protocol</th>
+                                                <th class="sortable" data-sort="local_address" data-type="string">Local Address</th>
+                                                <th class="sortable" data-sort="local_port" data-type="number">Local Port</th>
+                                                <th class="sortable" data-sort="remote_address" data-type="string">Remote Address</th>
+                                                <th class="sortable" data-sort="remote_port" data-type="number">Remote Port</th>
+                                                <th class="sortable" data-sort="state" data-type="string">State</th>
+                                                <th class="sortable" data-sort="process_name" data-type="string">Process</th>
                                             </tr>
                                         </thead>
                                         <tbody id="networkTableBody">
@@ -214,16 +234,26 @@
                             </div>
                             
                             <div class="tab-panel" id="persistencePanel">
-                                <h3>Persistence Mechanisms</h3>
+                                <div class="panel-header">
+                                    <h3>Persistence Mechanisms</h3>
+                                    <div class="panel-controls">
+                                        <input type="text" id="persistenceSearch" class="search-input" placeholder="Search persistence...">
+                                        <button class="btn btn-secondary btn-small" id="exportPersistenceBtn">
+                                            <i data-lucide="download" style="width: 14px; height: 14px;"></i>
+                                            Export to CSV
+                                        </button>
+                                    </div>
+                                </div>
+                                <div id="persistenceWarning" class="data-warning hidden"></div>
                                 <div class="table-container">
                                     <table class="data-table" id="persistenceTable">
                                         <thead>
                                             <tr>
-                                                <th>Type</th>
-                                                <th>Name</th>
-                                                <th>Location</th>
-                                                <th>Value</th>
-                                                <th>Suspicious</th>
+                                                <th class="sortable" data-sort="type" data-type="string">Type</th>
+                                                <th class="sortable" data-sort="name" data-type="string">Name</th>
+                                                <th class="sortable" data-sort="location" data-type="string">Location</th>
+                                                <th class="sortable" data-sort="value" data-type="string">Value</th>
+                                                <th class="sortable" data-sort="is_suspicious" data-type="boolean">Suspicious</th>
                                             </tr>
                                         </thead>
                                         <tbody id="persistenceTableBody">
@@ -234,17 +264,27 @@
                             </div>
                             
                             <div class="tab-panel" id="eventsPanel">
-                                <h3>Event Logs</h3>
+                                <div class="panel-header">
+                                    <h3>Event Logs</h3>
+                                    <div class="panel-controls">
+                                        <input type="text" id="eventsSearch" class="search-input" placeholder="Search events...">
+                                        <button class="btn btn-secondary btn-small" id="exportEventsBtn">
+                                            <i data-lucide="download" style="width: 14px; height: 14px;"></i>
+                                            Export to CSV
+                                        </button>
+                                    </div>
+                                </div>
+                                <div id="eventsWarning" class="data-warning hidden"></div>
                                 <div class="table-container">
                                     <table class="data-table" id="eventsTable">
                                         <thead>
                                             <tr>
-                                                <th>Log</th>
-                                                <th>Event ID</th>
-                                                <th>Level</th>
-                                                <th>Source</th>
-                                                <th>Timestamp</th>
-                                                <th>Message</th>
+                                                <th class="sortable" data-sort="log_name" data-type="string">Log Name</th>
+                                                <th class="sortable" data-sort="event_id" data-type="number">Event ID</th>
+                                                <th class="sortable" data-sort="level" data-type="string">Level</th>
+                                                <th class="sortable" data-sort="source" data-type="string">Source</th>
+                                                <th class="sortable" data-sort="timestamp" data-type="string">Timestamp</th>
+                                                <th class="sortable" data-sort="message" data-type="string">Message</th>
                                             </tr>
                                         </thead>
                                         <tbody id="eventsTableBody">
@@ -258,18 +298,28 @@
                                 <h3>Execution Evidence</h3>
                                 
                                 <div class="execution-section">
-                                    <h4>
-                                        <i data-lucide="file-text" style="width: 18px; height: 18px; vertical-align: middle; margin-right: 6px;"></i>
-                                        Prefetch Files
-                                    </h4>
+                                    <div class="panel-header">
+                                        <h4 style="margin: 0;">
+                                            <i data-lucide="file-text" style="width: 18px; height: 18px; vertical-align: middle; margin-right: 6px;"></i>
+                                            Prefetch Files
+                                        </h4>
+                                        <div class="panel-controls">
+                                            <input type="text" id="prefetchSearch" class="search-input" placeholder="Search prefetch...">
+                                            <button class="btn btn-secondary btn-small" id="exportPrefetchBtn">
+                                                <i data-lucide="download" style="width: 14px; height: 14px;"></i>
+                                                Export to CSV
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div id="prefetchWarning" class="data-warning hidden"></div>
                                     <div class="table-container">
                                         <table class="data-table" id="prefetchTable">
                                             <thead>
                                                 <tr>
-                                                    <th>Executable Name</th>
-                                                    <th>Run Count</th>
-                                                    <th>Last Run Time</th>
-                                                    <th>File Path</th>
+                                                    <th class="sortable" data-sort="executable_name" data-type="string">Executable Name</th>
+                                                    <th class="sortable" data-sort="run_count" data-type="number">Run Count</th>
+                                                    <th class="sortable" data-sort="last_run_time" data-type="string">Last Run Time</th>
+                                                    <th class="sortable" data-sort="file_path" data-type="string">File Path</th>
                                                 </tr>
                                             </thead>
                                             <tbody id="prefetchTableBody">
@@ -280,18 +330,28 @@
                                 </div>
                                 
                                 <div class="execution-section">
-                                    <h4>
-                                        <i data-lucide="database" style="width: 18px; height: 18px; vertical-align: middle; margin-right: 6px;"></i>
-                                        Shimcache Entries
-                                    </h4>
+                                    <div class="panel-header">
+                                        <h4 style="margin: 0;">
+                                            <i data-lucide="database" style="width: 18px; height: 18px; vertical-align: middle; margin-right: 6px;"></i>
+                                            Shimcache Entries
+                                        </h4>
+                                        <div class="panel-controls">
+                                            <input type="text" id="shimcacheSearch" class="search-input" placeholder="Search shimcache...">
+                                            <button class="btn btn-secondary btn-small" id="exportShimcacheBtn">
+                                                <i data-lucide="download" style="width: 14px; height: 14px;"></i>
+                                                Export to CSV
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div id="shimcacheWarning" class="data-warning hidden"></div>
                                     <div class="table-container">
                                         <table class="data-table" id="shimcacheTable">
                                             <thead>
                                                 <tr>
-                                                    <th>Path</th>
-                                                    <th>Last Modified</th>
-                                                    <th>File Size</th>
-                                                    <th>Execution Flag</th>
+                                                    <th class="sortable" data-sort="path" data-type="string">Path</th>
+                                                    <th class="sortable" data-sort="last_modified" data-type="string">Last Modified</th>
+                                                    <th class="sortable" data-sort="file_size" data-type="number">File Size</th>
+                                                    <th class="sortable" data-sort="execution_flag" data-type="boolean">Execution Flag</th>
                                                 </tr>
                                             </thead>
                                             <tbody id="shimcacheTableBody">
@@ -347,6 +407,27 @@
                     <button class="btn btn-secondary" id="cancelConfigBtn">Cancel</button>
                     <button class="btn btn-primary" id="startConfiguredScanBtn">Start Scan</button>
                 </div>
+            </div>
+        </div>
+
+        <!-- Context Menu -->
+        <div class="context-menu" id="contextMenu">
+            <div class="context-menu-item" data-action="copy-value">
+                <i data-lucide="copy"></i>
+                <span>Copy Value</span>
+            </div>
+            <div class="context-menu-item" data-action="copy-row">
+                <i data-lucide="clipboard"></i>
+                <span>Copy Row as Text</span>
+            </div>
+            <div class="context-menu-divider"></div>
+            <div class="context-menu-item" data-action="search-online">
+                <i data-lucide="search"></i>
+                <span>Search Online</span>
+            </div>
+            <div class="context-menu-item" data-action="virustotal">
+                <i data-lucide="shield-alert"></i>
+                <span>Check on VirusTotal</span>
             </div>
         </div>
 
