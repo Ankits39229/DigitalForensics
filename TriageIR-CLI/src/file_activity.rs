@@ -56,7 +56,6 @@ pub fn collect_file_activity(hours: u64) -> Result<FileActivityReport, String> {
     collect_downloads(&mut report, &cutoff_time);
     collect_recycle_bin(&mut report, &cutoff_time);
     collect_user_documents(&mut report, &cutoff_time);
-    collect_temp_files(&mut report, &cutoff_time);
 
     report.sort_by_timestamp();
     Ok(report)
@@ -193,19 +192,6 @@ fn collect_user_documents(report: &mut FileActivityReport, cutoff_time: &DateTim
 }
 
 /// Collect recently created/modified temp files
-fn collect_temp_files(report: &mut FileActivityReport, cutoff_time: &DateTime<Utc>) {
-    let temp_paths = vec![
-        std::env::var("TEMP").unwrap_or_default(),
-        std::env::var("TMP").unwrap_or_default(),
-    ];
-
-    for temp_path in temp_paths {
-        if !temp_path.is_empty() {
-            scan_directory_recursive(Path::new(&temp_path), report, cutoff_time, "Temp Files", 1);
-        }
-    }
-}
-
 /// Recursively scan directory for recent file activity
 fn scan_directory_recursive(
     path: &Path,

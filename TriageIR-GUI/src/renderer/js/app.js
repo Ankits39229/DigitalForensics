@@ -1168,6 +1168,20 @@ class TriageIRApp {
                     }
                     rowData = validShimcache[rowIndex];
                     break;
+                case 'fileactivity':
+                    const fileActivity = this.currentScanData?.artifacts?.file_activity;
+                    if (fileActivity && fileActivity.activities) {
+                        let activities = [...fileActivity.activities];
+                        // Apply sorting if active
+                        const activitySortState = this.sortState.fileactivity;
+                        if (activitySortState && activitySortState.column && activitySortState.direction) {
+                            const header = document.querySelector(`#fileActivityTable th[data-sort="${activitySortState.column}"]`);
+                            const dataType = header ? header.getAttribute('data-type') : 'string';
+                            activities = this.sortData(activities, activitySortState.column, activitySortState.direction, dataType);
+                        }
+                        rowData = activities[rowIndex];
+                    }
+                    break;
             }
             
             if (rowData) {
@@ -1214,6 +1228,9 @@ class TriageIRApp {
                 break;
             case 'shimcache':
                 detailHTML += this.buildShimcacheDetails(data);
+                break;
+            case 'fileactivity':
+                detailHTML += this.buildFileActivityDetails(data);
                 break;
         }
         
@@ -2154,6 +2171,82 @@ class TriageIRApp {
         ]);
         
         this.downloadCSV('shimcache-entries.csv', headers, rows);
+    }
+
+    buildFileActivityDetails(activity) {
+        const escapeHtml = (text) => {
+            const div = document.createElement('div');
+            div.textContent = text || '';
+            return div.innerHTML;
+        };
+        
+        return `
+            <div class="detail-section">
+                <h4>File Information</h4>
+                <div class="detail-field">
+                    <span class="detail-label">Full Path:</span>
+                    <span class="detail-value copyable">${escapeHtml(activity.file_path)}</span>
+                </div>
+                <div class="detail-field">
+                    <span class="detail-label">Action:</span>
+                    <span class="detail-value">${this.getActionBadge(activity.action)}</span>
+                </div>
+                <div class="detail-field">
+                    <span class="detail-label">Timestamp:</span>
+                    <span class="detail-value copyable">${escapeHtml(activity.timestamp)}</span>
+                </div>
+                <div class="detail-field">
+                    <span class="detail-label">Source:</span>
+                    <span class="detail-value">${escapeHtml(activity.source)}</span>
+                </div>
+            </div>
+            <div class="detail-section">
+                <h4>File Details</h4>
+                <div class="detail-field">
+                    <span class="detail-label">File Size:</span>
+                    <span class="detail-value">${activity.file_size ? this.formatFileSize(activity.file_size) + ' (' + activity.file_size.toLocaleString() + ' bytes)' : 'N/A'}</span>
+                </div>
+                <div class="detail-field">
+                    <span class="detail-label">Extension:</span>
+                    <span class="detail-value">${activity.file_extension ? '.' + activity.file_extension : 'N/A'}</span>
+                </div>
+                ${activity.previous_path ? `
+                <div class="detail-field">
+                    <span class="detail-label">Previous Path:</span>
+                    <span class="detail-value copyable">${escapeHtml(activity.previous_path)}</span>
+                </div>
+                ` : ''}
+            </div>
+            <div class="detail-section">
+                <h4>Collection Information</h4>
+                <div class="detail-field">
+                    <span class="detail-label">Data Source:</span>
+                    <span class="detail-value">${escapeHtml(activity.source)}</span>
+                </div>
+                <div class="detail-field">
+                    <span class="detail-label">Formatted Timestamp:</span>
+                    <span class="detail-value">${this.formatTimestamp(activity.timestamp)}</span>
+                </div>
+                ${activity.action === 'Deleted' ? `
+                <div class="detail-field" style="grid-column: 1 / -1;">
+                    <span class="detail-label">Note:</span>
+                    <span class="detail-value" style="color: var(--color-status-warning);">
+                        <i data-lucide="alert-triangle" style="width: 14px; height: 14px;"></i>
+                        This file was deleted and moved to the Recycle Bin
+                    </span>
+                </div>
+                ` : ''}
+                ${activity.action === 'Modified' ? `
+                <div class="detail-field" style="grid-column: 1 / -1;">
+                    <span class="detail-label">Note:</span>
+                    <span class="detail-value" style="color: var(--color-status-info);">
+                        <i data-lucide="info" style="width: 14px; height: 14px;"></i>
+                        File was modified within the last 24 hours
+                    </span>
+                </div>
+                ` : ''}
+            </div>
+        `;
     }
 
     filterFileActivity(searchTerm) {
