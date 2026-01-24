@@ -30,7 +30,7 @@ TriageIR is an advanced, enterprise-ready digital forensics and incident respons
 ```powershell
 # Administrative installation
 cd TriageIR-CLI
-cargo build --release --features enterprise
+cargo build --release
 .\target\release\triageir-cli.exe --output evidence\scan-results.json --verbose
 ```
 
@@ -38,9 +38,21 @@ cargo build --release --features enterprise
 ```powershell
 # Start the GUI management console
 cd TriageIR-GUI
-npm install --production
+npm install
 npm run start
+
+# Quick scan - Click "Quick Scan" button in GUI
+# Load previous scan - Click "Load Results" and select JSON file
+# Export data - Use CSV export buttons in each table or save as HTML report
 ```
+
+### Key GUI Features
+- **Search**: Use search boxes in each tab to filter large datasets
+- **Sort**: Click any column header to sort (click again for descending, third time to reset)
+- **Expand Details**: Click any table row to view complete artifact information
+- **Copy Data**: Click copyable fields or right-click for context menu options
+- **Export**: Use CSV export buttons for complete datasets or save HTML reports
+- **VirusTotal Lookup**: Right-click on hashes to check on VirusTotal
 
 ## 📁 Project Structure
 
@@ -124,20 +136,51 @@ TriageIR/
 
 ### 6. Execution Evidence Collection
 **File execution artifact analysis for timeline reconstruction**
-- ✅ **Prefetch File Analysis**: Windows Prefetch parsing for program execution history
-- ✅ **Shimcache (AppCompatCache)**: Registry-based execution artifact extraction
+- ✅ **Prefetch File Analysis**: Windows Prefetch parsing for program execution history with run counts
+- ✅ **Shimcache (AppCompatCache)**: Registry-based execution artifact extraction with timestamps
+- ✅ **Execution Timeline**: Combined view of Prefetch and Shimcache data for comprehensive analysis
+- ✅ **Referenced Files Tracking**: Prefetch referenced files for dependency analysis
+- ✅ **Execution Flag Detection**: Shimcache execution flag verification
+- ✅ **Data Validation**: Corrupt entry filtering and validation for forensic integrity
 - ✅ **AmCache Analysis**: Application compatibility database parsing (upcoming)
 - ✅ **UserAssist Forensics**: GUI program execution tracking (upcoming)
 - ✅ **Jump List Analysis**: Recent document and application tracking (upcoming)
 
 ### 7. Professional GUI Management Console
-**Intuitive interface for enterprise forensic workflows**
-- ✅ **Dashboard Overview**: Real-time system status and artifact statistics
-- ✅ **Multi-Tab Analysis Interface**: Processes, Network, Persistence, Events, System Info
-- ✅ **Quick Scan Automation**: One-click comprehensive system analysis
-- ✅ **Export Capabilities**: JSON and HTML report generation for documentation
-- ✅ **Search & Filtering**: Advanced data table filtering for large datasets
-- ✅ **Professional Theming**: Dark mode interface for extended analysis sessions
+**Intuitive interface with advanced data interaction for enterprise forensic workflows**
+- ✅ **Multi-Tab Analysis Interface**: Overview, System Info, Processes, Network, Persistence, Events, Execution Evidence
+- ✅ **Real-Time Progress Tracking**: Live scan progress with detailed status messages and audit logs
+- ✅ **Advanced Data Tables**: 
+  - Sortable columns with three-state sorting (ascending, descending, none)
+  - Type-aware sorting (numeric, string, boolean)
+  - Visual sort indicators for better UX
+- ✅ **Search & Filter**: 
+  - Debounced search (300ms) across all 6 tables
+  - Multi-field matching with case-insensitive search
+  - Real-time filtering with instant results
+- ✅ **Pagination & Performance**:
+  - Efficient handling of large datasets (50 items per page)
+  - Automatic truncation warnings with dataset counts
+  - CSV export for complete data analysis
+- ✅ **Interactive Data Features**:
+  - **Expandable Rows**: Click any row to view complete artifact details
+  - **Click-to-Copy**: One-click copy for hashes, PIDs, paths, command lines
+  - **Context Menus**: Right-click for quick actions (copy, search Google, VirusTotal lookup)
+  - **Detail Panels**: Comprehensive view with all artifact attributes
+- ✅ **Export Capabilities**: 
+  - JSON import/export for scan data
+  - HTML report generation with embedded styling
+  - CSV export for each artifact type
+  - Professional reports with complete forensic data
+- ✅ **Modern UI/UX**:
+  - Microsoft Fluent Design System
+  - Smooth animations and transitions
+  - Professional iconography (Lucide icons)
+  - Dark mode interface for extended analysis sessions
+  - Visual feedback for all interactions
+- ✅ **Dashboard Overview**: Real-time system status and artifact statistics with summary cards
+- ✅ **Quick Scan Automation**: One-click comprehensive system analysis with progress tracking
+- ✅ **Session Management**: Automatic session recovery and scan history
 
 ### 8. Forensic Integrity & Compliance
 **Enterprise-grade evidence handling and documentation**
@@ -696,6 +739,47 @@ TriageIR-Portable.zip: [checksum-available-in-release]
 
 ---
 
-**Status**: ✅ Production Ready  
+## 🎉 Recent Updates & Improvements
+
+### January 2026 - Major GUI Enhancement Release
+**Advanced Data Interaction Features (Issues 2.3.1, 2.3.2, 2.3.3)**
+- ✅ **Expandable Row Details**: Click any table row to view complete artifact information
+  - Full command lines for processes
+  - Complete network connection details
+  - All persistence mechanism attributes
+  - Full event log messages
+  - Prefetch referenced files
+  - Shimcache execution history
+- ✅ **Click-to-Copy Functionality**: One-click copy with visual feedback for:
+  - Process IDs, hashes (MD5/SHA1/SHA256), command lines
+  - Network addresses, ports, connection details
+  - File paths, registry keys, timestamps
+- ✅ **Context Menus**: Right-click for quick forensic actions:
+  - Copy values to clipboard
+  - Search on Google
+  - Check hashes on VirusTotal
+  - Copy entire rows as text
+- ✅ **Search & Filter**: Debounced search across all 6 tables with real-time filtering
+- ✅ **Sortable Columns**: Three-state sorting (ascending, descending, none) with type-aware logic
+- ✅ **Pagination**: Efficient handling of large datasets (50 items per page)
+- ✅ **CSV Export**: Export complete datasets for external analysis
+- ✅ **Data Truncation Warnings**: Automatic alerts when viewing paginated data
+- ✅ **Professional UI/UX**: Microsoft Fluent Design System with smooth animations
+
+**Execution Evidence Tab Added**
+- ✅ Dedicated tab for Prefetch and Shimcache analysis
+- ✅ Corrupt entry filtering for data integrity
+- ✅ Empty state messages with helpful guidance
+- ✅ Sortable and searchable execution timeline
+
+**Bug Fixes & Stability**
+- ✅ Fixed window control buttons (close, minimize, maximize)
+- ✅ Resolved pointer-events CSS conflicts
+- ✅ Improved event handler reliability
+
+---
+
+**Status**: ✅ **Production Ready** - All Core Features Implemented  
 **Version**: 1.0.0  
+**Last Updated**: January 24, 2026  
 **License**: MIT License
