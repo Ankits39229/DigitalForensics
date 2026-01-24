@@ -20,13 +20,13 @@
                 <div class="titlebar-title">TriageIR - Digital Forensics Triage Tool</div>
             </div>
             <div class="titlebar-controls">
-                <button class="titlebar-button" id="minimizeBtn" title="Minimize">
+                <button class="titlebar-button" id="minimizeBtn" title="Minimize" onclick="require('electron').ipcRenderer.send('window-minimize')">
                     <i data-lucide="minus" style="width: 12px; height: 12px;"></i>
                 </button>
-                <button class="titlebar-button" id="maximizeBtn" title="Maximize">
+                <button class="titlebar-button" id="maximizeBtn" title="Maximize" onclick="require('electron').ipcRenderer.send('window-maximize')">
                     <i data-lucide="square" style="width: 12px; height: 12px;"></i>
                 </button>
-                <button class="titlebar-button titlebar-close" id="closeBtn" title="Close">
+                <button class="titlebar-button titlebar-close" id="closeBtn" title="Close" onclick="require('electron').ipcRenderer.send('window-close')">
                     <i data-lucide="x" style="width: 12px; height: 12px;"></i>
                 </button>
             </div>
@@ -380,6 +380,34 @@
             </div>
         </div>
 
+        <!-- Confirmation Modal -->
+        <div class="modal hidden" id="confirmationModal">
+            <div class="modal-content confirmation-modal">
+                <div class="modal-header confirmation-header">
+                    <h3>
+                        <i data-lucide="alert-triangle" style="width: 20px; height: 20px; vertical-align: middle; margin-right: 6px; color: #F59E0B;"></i>
+                        Cancel Scan Operation
+                    </h3>
+                </div>
+                <div class="modal-body">
+                    <div class="confirmation-content">
+                        <p class="confirmation-title">Are you sure you want to cancel the scan?</p>
+                        <p class="confirmation-description">The scan is still in progress. Cancelling will:</p>
+                        <ul class="confirmation-list">
+                            <li>Terminate the running scan process</li>
+                            <li>Discard any partial results</li>
+                            <li>Clean up temporary files</li>
+                        </ul>
+                        <p class="confirmation-warning">This action cannot be undone.</p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" id="confirmCancelAbort">Cancel Operation</button>
+                    <button class="btn btn-danger" id="confirmCancelOK">Continue Cancelling</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Footer -->
         <footer class="app-footer">
             <div class="footer-content">
@@ -395,6 +423,11 @@
         // Initialize Lucide icons after page loads
         document.addEventListener('DOMContentLoaded', () => {
             lucide.createIcons();
+            
+            // Force re-initialize after a short delay to ensure all dynamic content is ready
+            setTimeout(() => {
+                lucide.createIcons();
+            }, 100);
         });
     </script>
 </body>

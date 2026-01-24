@@ -164,6 +164,8 @@ h4 svg {
     display: flex;
     height: 100%;
     -webkit-app-region: no-drag;
+    position: relative;
+    z-index: 1000; /* Ensure controls are above drag region */
 }
 
 .titlebar-button {
@@ -179,7 +181,8 @@ h4 svg {
     transition: background-color var(--duration-fast) var(--easing-standard);
     padding: 0;
     position: relative;
-    z-index: 100; /* Ensure button is above other elements */
+    z-index: 1001; /* Even higher than controls container */
+    -webkit-app-region: no-drag; /* Explicitly disable drag */
 }
 
 /* Ensure all child elements never block clicks */
@@ -1117,6 +1120,81 @@ h4 svg {
     border-radius: var(--radius-small);
     border: 1px solid var(--color-stroke-surface);
     transition: all var(--duration-fast) var(--easing-standard);
+}
+
+/* Fluent Confirmation Modal */
+.confirmation-modal {
+    max-width: 500px;
+}
+
+.confirmation-header {
+    background: linear-gradient(135deg, #FEA724 0%, #F59E0B 100%);
+    color: white;
+    border-bottom: none;
+}
+
+.confirmation-header h3 {
+    color: white;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.confirmation-content {
+    padding: var(--spacing-l);
+    background: var(--color-bg-card);
+}
+
+.confirmation-title {
+    font-size: var(--font-size-body-large);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-primary);
+    margin: 0 0 var(--spacing-m) 0;
+}
+
+.confirmation-description {
+    font-size: var(--font-size-body);
+    color: var(--color-text-secondary);
+    margin: 0 0 var(--spacing-m) 0;
+}
+
+.confirmation-list {
+    margin: var(--spacing-m) 0;
+    padding-left: 24px;
+    list-style: disc;
+}
+
+.confirmation-list li {
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-body);
+    margin-bottom: var(--spacing-s);
+    line-height: 1.5;
+}
+
+.confirmation-warning {
+    font-size: var(--font-size-body);
+    color: var(--color-error);
+    font-weight: var(--font-weight-semibold);
+    margin: var(--spacing-l) 0 0 0;
+    padding-top: var(--spacing-m);
+    border-top: 1px solid var(--color-stroke-surface);
+}
+
+/* Danger Button */
+.btn-danger {
+    background: var(--color-error);
+    color: white;
+    border: none;
+}
+
+.btn-danger:hover {
+    background: #DA3B01;
+    box-shadow: var(--shadow-medium);
+}
+
+.btn-danger:active {
+    background: #C92A0A;
 }
 
 .error-technical summary:hover {

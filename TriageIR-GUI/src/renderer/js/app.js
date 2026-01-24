@@ -236,12 +236,16 @@ class TriageIRApp {
             }
         } catch (error) {
             console.error('Scan failed:', error);
-            this.showError({
-                category: 'Scan Execution Error',
-                message: 'The scan failed to complete successfully.',
-                remedy: 'Check that you have Administrator privileges and try again. If the problem persists, check the technical details below.',
-                technical: error.stdout || error.message || JSON.stringify(error, null, 2)
-            });
+            
+            // Don't show error if scan was cancelled by user
+            if (!error.cancelled) {
+                this.showError({
+                    category: 'Scan Execution Error',
+                    message: 'The scan failed to complete successfully.',
+                    remedy: 'Check that you have Administrator privileges and try again. If the problem persists, check the technical details below.',
+                    technical: error.stdout || error.message || JSON.stringify(error, null, 2)
+                });
+            }
             this.showWelcomeScreen();
         } finally {
             this.isScanning = false;
@@ -303,12 +307,16 @@ class TriageIRApp {
             }
         } catch (error) {
             console.error('Scan failed:', error);
-            this.showError({
-                category: 'Scan Execution Error',
-                message: 'The scan failed to complete successfully.',
-                remedy: 'Check that you have Administrator privileges and try again.',
-                technical: error.stdout || error.message || JSON.stringify(error, null, 2)
-            });
+            
+            // Don't show error if scan was cancelled by user
+            if (!error.cancelled) {
+                this.showError({
+                    category: 'Scan Execution Error',
+                    message: 'The scan failed to complete successfully.',
+                    remedy: 'Check that you have Administrator privileges and try again.',
+                    technical: error.stdout || error.message || JSON.stringify(error, null, 2)
+                });
+            }
             this.showWelcomeScreen();
         } finally {
             this.isScanning = false;
@@ -337,15 +345,94 @@ class TriageIRApp {
             return;
         }
         
+        // Show custom confirmation modal instead of browser confirm
+        return new Promise((resolve) => {
+            const confirmModal = document.getElementById('confirmationModal');
+            const confirmOKBtn = document.getElementById('confirmCancelOK');
+            const confirmAbortBtn = document.getElementById('confirmCancelAbort');
+            
+            if (!confirmModal) {
+                console.error('Confirmation modal not found');
+                resolve();
+                return;
+            }
+            
+            // Show modal
+            confirmModal.classList.remove('hidden');
+            
+            // Handle confirm
+            const handleConfirm = async () => {
+                confirmModal.classList.add('hidden');
+                removeListeners();
+                resolve(true);
+                await this.performScanCancellation();
+            };
+            
+            // Handle abort
+            const handleAbort = () => {
+                confirmModal.classList.add('hidden');
+                removeListeners();
+                resolve(false);
+                console.log('Scan cancellation aborted by user');
+            };
+            
+            // Clean up listeners
+            const removeListeners = () => {
+                confirmOKBtn.removeEventListener('click', handleConfirm);
+                confirmAbortBtn.removeEventListener('click', handleAbort);
+            };
+            
+            // Attach listeners
+            confirmOKBtn.addEventListener('click', handleConfirm);
+            confirmAbortBtn.addEventListener('click', handleAbort);
+        });
+    }
+
+    async performScanCancellation() {
         try {
+            // Update UI to show cancellation in progress
+            const progressText = document.getElementById('progressText');
+            const progressFill = document.getElementById('progressFill');
+            const logContent = document.getElementById('logContent');
+            
+            if (progressText) {
+                progressText.textContent = 'Cancelling scan...';
+            }
+            if (progressFill) {
+                progressFill.style.width = '0%';
+            }
+            if (logContent) {
+                logContent.textContent += '\n⚠️ Scan cancellation requested by user...\n';
+                logContent.textContent += '🛑 Terminating CLI process...\n';
+                logContent.scrollTop = logContent.scrollHeight;
+            }
+            
+            // Request scan cancellation from main process
             const result = await ipcRenderer.invoke('cancel-scan');
+            
+            if (logContent) {
+                if (result.success) {
+                    logContent.textContent += '✓ Scan process terminated successfully\n';
+                    logContent.textContent += '🧹 Cleaning up temporary files...\n';
+                    logContent.textContent += '✓ Cleanup complete\n';
+                } else {
+                    logContent.textContent += '⚠️ No active scan process found\n';
+                }
+                logContent.scrollTop = logContent.scrollHeight;
+            }
+            
+            // Wait a moment to let user see the cleanup messages
+            await new Promise(resolve => setTimeout(resolve, 800));
+            
             if (result.success) {
                 console.log('Scan cancelled successfully');
-                this.isScanning = false;
-                this.showWelcomeScreen();
             } else {
                 console.warn('No active scan to cancel');
             }
+            
+            this.isScanning = false;
+            this.showWelcomeScreen();
+            
         } catch (error) {
             console.error('Failed to cancel scan:', error);
             // Force return to welcome screen anyway

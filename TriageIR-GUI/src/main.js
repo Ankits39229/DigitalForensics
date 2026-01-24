@@ -122,7 +122,18 @@ class TriageIRMain {
     setupIPC() {
         // Handle scan requests
         ipcMain.handle('start-scan', async (event, options) => {
-            return this.executeScan(options);
+            try {
+                return await this.executeScan(options);
+            } catch (error) {
+                // Return error object instead of throwing (IPC serialization issue)
+                return {
+                    success: false,
+                    error: error.error || error.message || 'Unknown error',
+                    stdout: error.stdout || '',
+                    stderr: error.stderr || '',
+                    cancelled: error.cancelled || false
+                };
+            }
         });
 
         // Handle scan cancellation
@@ -207,9 +218,28 @@ class TriageIRMain {
     cancelScan() {
         if (this.currentScanProcess) {
             console.log('Cancelling scan process...');
+            
+            // Store temp file reference before killing process
+            const tempFiles = fs.readdirSync(__dirname).filter(f => f.startsWith('temp-scan-'));
+            
+            // Terminate the process
             this.currentScanProcess.kill('SIGTERM');
             this.currentScanProcess = null;
-            return { success: true, message: 'Scan cancelled' };
+            
+            // Clean up temporary scan files
+            tempFiles.forEach(tempFile => {
+                try {
+                    const tempPath = path.join(__dirname, tempFile);
+                    if (fs.existsSync(tempPath)) {
+                        fs.unlinkSync(tempPath);
+                        console.log(`Cleaned up temporary file: ${tempFile}`);
+                    }
+                } catch (cleanupError) {
+                    console.warn(`Failed to cleanup temp file ${tempFile}:`, cleanupError);
+                }
+            });
+            
+            return { success: true, message: 'Scan cancelled and temporary files cleaned up' };
         }
         return { success: false, message: 'No active scan to cancel' };
     }
@@ -253,6 +283,31 @@ class TriageIRMain {
 
             process.on('close', (code) => {
                 this.currentScanProcess = null; // Clear process reference
+                
+                // Check if scan was cancelled (SIGTERM exit code varies by platform)
+                if (code === null || code === 15 || code === 143 || code === 1) {
+                    // Scan was likely cancelled, clean up temp file
+                    try {
+                        if (fs.existsSync(tempFile)) {
+                            fs.unlinkSync(tempFile);
+                            console.log('Cleaned up temp file after cancellation');
+                        }
+                    } catch (cleanupError) {
+                        console.warn('Failed to cleanup temp file:', cleanupError);
+                    }
+                    
+                    // If code is null or termination code, it was cancelled
+                    if (code === null || code === 15 || code === 143) {
+                        reject({
+                            success: false,
+                            error: 'Scan was cancelled by user',
+                            cancelled: true,
+                            stdout: stdout,
+                            stderr: stderr
+                        });
+                        return;
+                    }
+                }
                 
                 if (code === 0 || code === 2) { // Accept exit code 2 as success (warnings)
                     try {

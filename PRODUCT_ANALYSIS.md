@@ -207,7 +207,7 @@ updateScanProgress(message) {
 
 ---
 
-#### Issue 2.2.2: Cancel Scan Incomplete
+#### Issue 2.2.2: Cancel Scan Incomplete![1769252311577](image/PRODUCT_ANALYSIS/1769252311577.png)![1769252314790](image/PRODUCT_ANALYSIS/1769252314790.png)
 **Severity:** 🟡 MEDIUM  
 **Code Location:** `app.js:178-182`
 
